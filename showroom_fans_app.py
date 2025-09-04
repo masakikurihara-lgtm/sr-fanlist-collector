@@ -26,9 +26,12 @@ st.markdown(
 st.markdown("---")
 
 # ルームID入力
-room_id = st.text_input("対象のルームID（例：481475）", value="")
+room_id = st.text_input(
+    "対象のルームID（例：481475）",
+    value=""
+)
 
-# 月の範囲（最新月が上に来る）
+# 月の範囲（最新月上）
 start_month = 202501
 current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
@@ -36,23 +39,29 @@ months_list.reverse()
 month_labels = [str(m) for m in months_list]
 
 # 月選択
-selected_months = st.multiselect("取得したい月を選択", options=month_labels, default=[])
+selected_months = st.multiselect(
+    "取得したい月を選択",
+    options=month_labels,
+    default=[]
+)
 
-# 月選択と実行ボタンの間に余白
+# 月選択とボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 # ZIPバッファ
 zip_buffer = BytesIO()
 zip_file = ZipFile(zip_buffer, "w")
 
-# 実行ボタン（左寄せ）
+# 実行ボタン
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
+
     if not room_id or not selected_months:
         st.warning("ルームIDと月を必ず選択してください。")
     else:
         st.info(f"{len(selected_months)}か月分のデータを取得します。")
+
         monthly_counts = {}
         overall_progress = st.progress(0)
         overall_text = st.empty()
@@ -77,10 +86,12 @@ if start_button:
             unsafe_allow_html=True
         )
 
-        # 月ごとの取得
-        all_fans_data = []  # マージ用
+        all_fans_data = []
+
+        # 月ごとに取得
         for idx, month in enumerate(selected_months):
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
+
             st.markdown(
                 f"<div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>"
                 f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>"
@@ -88,7 +99,7 @@ if start_button:
                 unsafe_allow_html=True
             )
 
-            col_text, col_bar = st.columns([3, 1])
+            col_text, col_bar = st.columns([3,1])
             with col_text:
                 month_text = st.empty()
             with col_bar:
@@ -112,21 +123,18 @@ if start_button:
                 retrieved += len(users)
 
                 if count > 0:
-                    month_progress.progress(min(retrieved / count, 1.0))
+                    month_progress.progress(min(retrieved/count,1.0))
                     month_text.markdown(
                         f"<p style='font-size:14px; color:#374151;'>{retrieved}/{count} 件取得中…</p>",
                         unsafe_allow_html=True
                     )
 
                 processed_fans += len(users)
-                overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
+                overall_progress.progress(min(processed_fans/total_fans_overall,1.0))
                 overall_text.markdown(
-                    f"<p style='font-size:14px; color:#1f2937;'>"
-                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
-                    f"</p>",
+                    f"<p style='font-size:14px; color:#1f2937;'>全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)</p>",
                     unsafe_allow_html=True
                 )
-
                 time.sleep(0.05)
 
             df = pd.DataFrame(fans_data)
@@ -140,12 +148,22 @@ if start_button:
             )
             month_progress.progress(1.0)
 
+        # マージ集計
+        merge_df = pd.DataFrame(all_fans_data)
+        if not merge_df.empty:
+            merge_df = merge_df.groupby(['user_id','user_name','avatar_id'], as_index=False).agg({'level':'sum'})
+            merge_df['title_id'] = (merge_df['level']//5).astype(int)
+            merge_df = merge_df.sort_values(by='level', ascending=False)
+            merge_df = merge_df[['avatar_id','level','title_id','user_id','user_name']]
+
+            merge_csv_bytes = merge_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            zip_file.writestr(f"active_fans_{room_id}_merge.csv", merge_csv_bytes)
+
         zip_file.close()
         zip_buffer.seek(0)
 
-        # ZIPダウンロード前余白
+        # ZIPダウンロード前に余白
         st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-
         st.download_button(
             label="ZIPをダウンロード",
             data=zip_buffer,
@@ -153,54 +171,35 @@ if start_button:
             mime="application/zip"
         )
 
-        # ---------- マージ集計表示 ----------
-        if all_fans_data:
-            merge_df = pd.DataFrame(all_fans_data)
-            # 集計
-            agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
-            agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
-            agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
-
-            # 順位計算（同じレベルは同順位）
-            agg_df['順位'] = 0
+        # --- マージ集計上位100位表示 ---
+        if not merge_df.empty:
+            display_df = merge_df[['avatar_id','level','user_name']].copy()
+            display_df = display_df.rename(columns={
+                'avatar_id':'アバター',
+                'level':'レベル合計値',
+                'user_name':'ユーザー名'
+            })
+            display_df['順位'] = 0
             last_level = None
             rank = 0
-            for i, row in agg_df.iterrows():
-                if row['level'] != last_level:
-                    rank = i + 1
-                    last_level = row['level']
-                agg_df.at[i, '順位'] = rank
-            agg_df = agg_df[agg_df['順位'] <= 100]
+            for i, row in enumerate(display_df.itertuples()):
+                if last_level != row._2:
+                    rank = i+1
+                    last_level = row._2
+                display_df.at[i,'順位'] = rank
+            display_df = display_df[display_df['順位']<=100]
 
-            # 表示用列順
-            display_df = agg_df[['順位','avatar_id','level','user_name']]
-            display_df.rename(columns={
-                'avatar_id': 'アバター',
-                'level': 'レベル合計値',
-                'user_name': 'ユーザー名'
-            }, inplace=True)
+            st.markdown("<h3 style='font-size:16px; color:#111827; margin-top:16px;'>マージ集計（上位100位）</h3>", unsafe_allow_html=True)
 
-            # ---------- 表示 ----------
-            st.markdown(
-                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
-                "マージ集計（上位100位）</h3>",
-                unsafe_allow_html=True
-            )
-
-            # テーブルスタイル
-            def style_table(df):
-                return df.style.set_table_styles([
-                    {'selector': 'th', 'props': [('text-align', 'center')]},
-                    {'selector': 'td', 'props': [('text-align', 'center')]},
-                    {'selector': 'td.col4', 'props': [('text-align', 'left')]},  # ユーザー名左寄せ
-                ])
-
-            # HTML表作成
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
             table_html += "<thead><tr>"
-            for col in display_df.columns:
-                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
+            for col in ['順位','アバター','レベル合計値','ユーザー名']:
+                table_html += (
+                    f"<th style='border-bottom:1px solid #ccc; padding:4px; "
+                    f"text-align:center; background-color:#f3f4f6;'>{col}</th>"
+                )
             table_html += "</tr></thead><tbody>"
+
             for idx, row in display_df.iterrows():
                 table_html += "<tr>"
                 table_html += f"<td style='text-align:center;'>{row['順位']}</td>"
@@ -211,4 +210,7 @@ if start_button:
             table_html += "</tbody></table>"
 
             st.markdown(table_html, unsafe_allow_html=True)
-            st.markdown("<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>",
+                unsafe_allow_html=True
+            )
