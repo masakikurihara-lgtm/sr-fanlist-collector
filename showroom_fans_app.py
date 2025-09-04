@@ -68,6 +68,8 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
+        all_fans_data = []  # マージ用に全データを保持
+
         # 総ファン数合計
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
@@ -141,11 +143,14 @@ if start_button:
 
                 time.sleep(0.05)
 
-            # DataFrameに変換して UTF-8 BOM 付きで保存
+            # DataFrameに変換
             df = pd.DataFrame(fans_data)
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
+
+            # マージ用にデータ追加
+            all_fans_data.extend(fans_data)
 
             # 月処理完了表示
             month_text.markdown(
@@ -153,6 +158,29 @@ if start_button:
                 unsafe_allow_html=True
             )
             month_progress.progress(1.0)
+
+        # ===== マージファイル作成 =====
+        if all_fans_data:
+            df_all = pd.DataFrame(all_fans_data)
+
+            # 同じ user_id ごとに集計
+            agg_df = (
+                df_all.groupby(["user_id", "user_name", "avatar_id"], as_index=False)
+                .agg({"level": "sum"})
+            )
+
+            # title_id を算出 (level // 5)
+            agg_df["title_id"] = (agg_df["level"] // 5).astype(int)
+
+            # 表示順を指定
+            agg_df = agg_df[["avatar_id", "level", "title_id", "user_id", "user_name"]]
+
+            # level 降順にソート
+            agg_df = agg_df.sort_values(by="level", ascending=False)
+
+            # CSV 書き込み
+            merged_csv = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            zip_file.writestr(f"active_fans_{room_id}_merged.csv", merged_csv)
 
         zip_file.close()
         zip_buffer.seek(0)
