@@ -156,12 +156,11 @@ if start_button:
         # ---------- マージ集計表示 ----------
         if all_fans_data:
             merge_df = pd.DataFrame(all_fans_data)
-            # 集計
             agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
             agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # 順位計算（同じレベルは同順位）
+            # 順位計算
             agg_df['順位'] = 0
             last_level = None
             rank = 0
@@ -172,7 +171,6 @@ if start_button:
                 agg_df.at[i, '順位'] = rank
             agg_df = agg_df[agg_df['順位'] <= 100]
 
-            # 表示用列順
             display_df = agg_df[['順位','avatar_id','level','user_name']]
             display_df.rename(columns={
                 'avatar_id': 'アバター',
@@ -182,17 +180,16 @@ if start_button:
 
             # ---------- 表示 ----------
             st.markdown(
-                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px; "
-                "background-color:#f0f9ff; padding:4px; border-radius:4px;'>"
+                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
                 "マージ集計（上位100位）</h3>",
                 unsafe_allow_html=True
             )
 
-            # HTML表作成
+            # HTML表作成（ヘッダー背景色を薄めに変更）
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
             table_html += "<thead><tr>"
             for col in display_df.columns:
-                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
+                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center; background-color:#f0f9ff;'>{col}</th>"
             table_html += "</tr></thead><tbody>"
             for idx, row in display_df.iterrows():
                 table_html += "<tr>"
