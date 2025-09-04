@@ -59,7 +59,7 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
-        # 総ファン数
+        # 総ファン数（マージ用）
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
             resp = requests.get(url)
@@ -69,13 +69,6 @@ if start_button:
                 total_fans_overall += monthly_counts[month]
             else:
                 monthly_counts[month] = 0
-
-        st.markdown(
-            f"<div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>"
-            f"<b>総ファン数合計:</b> {total_fans_overall} 件"
-            f"</div>",
-            unsafe_allow_html=True
-        )
 
         # 月ごとの取得
         all_fans_data = []  # マージ用
@@ -141,24 +134,46 @@ if start_button:
             )
             month_progress.progress(1.0)
 
-        # ---------- マージCSVファイル作成 ----------
+        # ---------- マージCSV作成 ----------
         if all_fans_data:
+            st.markdown(
+                f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:10px;'>"
+                f"<h2 style='font-size:20px; color:#111827;'>マージファイル作成中…</h2>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+            merge_progress = st.progress(0)
+            merge_text = st.empty()
+
             merge_df = pd.DataFrame(all_fans_data)
             agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
             agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            merge_csv_bytes = agg_df[['avatar_id','level','title_id','user_id','user_name']]
-            merge_csv_bytes = merge_csv_bytes.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            # マージCSV書き込み
+            merge_csv_rows = len(agg_df)
+            merge_csv_buffer = BytesIO()
+            temp_csv_bytes = []
+
+            for i, row in agg_df.iterrows():
+                temp_df = pd.DataFrame([row])
+                temp_csv_bytes.append(temp_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"))
+                merge_progress.progress((i + 1) / merge_csv_rows)
+                merge_text.markdown(
+                    f"<p style='font-size:14px; color:#374151;'>{i+1}/{merge_csv_rows} 件マージ中…</p>",
+                    unsafe_allow_html=True
+                )
+                time.sleep(0.01)
+
+            merge_csv_bytes = b"".join(temp_csv_bytes)
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
 
         zip_file.close()
         zip_buffer.seek(0)
 
-        # ZIPダウンロード前余白
+        # ZIPダウンロード
         st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-
         st.download_button(
             label="ZIPをダウンロード",
             data=zip_buffer,
@@ -168,11 +183,10 @@ if start_button:
 
         # ---------- マージ集計表示 ----------
         if all_fans_data:
-            # 画面表示用集計
             agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # 順位計算（同じレベルは同順位）
+            # 順位計算
             agg_df['順位'] = 0
             last_level = None
             rank = 0
@@ -183,7 +197,6 @@ if start_button:
                 agg_df.at[i, '順位'] = rank
             agg_df = agg_df[agg_df['順位'] <= 100]
 
-            # 表示用列
             display_df = agg_df[['順位','avatar_id','level','user_name']]
             display_df.rename(columns={
                 'avatar_id': 'アバター',
@@ -198,11 +211,9 @@ if start_button:
                 unsafe_allow_html=True
             )
 
-            # テーブルヘッダー背景色
-            header_bg = "#f3f4f6"  # 薄め
+            # HTML表作成
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
-            table_html += f"<thead style='background-color:{header_bg};'>"
-            table_html += "<tr>"
+            table_html += "<thead><tr style='background-color:#f3f4f6;'>"
             for col in display_df.columns:
                 table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
             table_html += "</tr></thead><tbody>"
