@@ -129,6 +129,7 @@ if start_button:
 
                 time.sleep(0.05)
 
+            # CSV作成
             df = pd.DataFrame(fans_data)
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
@@ -139,6 +140,18 @@ if start_button:
                 unsafe_allow_html=True
             )
             month_progress.progress(1.0)
+
+        # ---------- マージCSVファイル作成 ----------
+        if all_fans_data:
+            merge_df = pd.DataFrame(all_fans_data)
+            agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
+            agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
+            agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
+
+            merge_csv_bytes = agg_df[['avatar_id','level','title_id','user_id','user_name']]
+            merge_csv_bytes = merge_csv_bytes.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            merge_csv_name = f"active_fans_{room_id}_merge.csv"
+            zip_file.writestr(merge_csv_name, merge_csv_bytes)
 
         zip_file.close()
         zip_buffer.seek(0)
@@ -155,10 +168,8 @@ if start_button:
 
         # ---------- マージ集計表示 ----------
         if all_fans_data:
-            merge_df = pd.DataFrame(all_fans_data)
-            # 集計
+            # 画面表示用集計
             agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
-            agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
             agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
             # 順位計算（同じレベルは同順位）
@@ -172,26 +183,7 @@ if start_button:
                 agg_df.at[i, '順位'] = rank
             agg_df = agg_df[agg_df['順位'] <= 100]
 
-            # ---------- マージ進捗バー ----------
-            merge_text = st.empty()
-            merge_progress = st.progress(0)
-            total_rows = len(agg_df)
-            for i, row in agg_df.iterrows():
-                # 進捗更新
-                merge_progress.progress((i+1)/total_rows)
-                merge_text.markdown(
-                    f"<p style='font-size:14px; color:#374151;'>{i+1}/{total_rows} 件マージ集計中…</p>",
-                    unsafe_allow_html=True
-                )
-                time.sleep(0.01)  # 表示のための僅かな待機
-
-            merge_text.markdown(
-                f"<p style='font-size:14px; color:#10b981;'><b>マージ集計完了 ({total_rows} 件)</b></p>",
-                unsafe_allow_html=True
-            )
-            merge_progress.progress(1.0)
-
-            # 表示用列順
+            # 表示用列
             display_df = agg_df[['順位','avatar_id','level','user_name']]
             display_df.rename(columns={
                 'avatar_id': 'アバター',
@@ -199,16 +191,18 @@ if start_button:
                 'user_name': 'ユーザー名'
             }, inplace=True)
 
-            # ---------- 表示 ----------
+            # 表示タイトル
             st.markdown(
                 "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
                 "マージ集計（上位100位）</h3>",
                 unsafe_allow_html=True
             )
 
-            # ヘッダー背景を薄めの色に変更
+            # テーブルヘッダー背景色
+            header_bg = "#f3f4f6"  # 薄め
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
-            table_html += "<thead><tr style='background-color:#f3f4f6;'>"
+            table_html += f"<thead style='background-color:{header_bg};'>"
+            table_html += "<tr>"
             for col in display_df.columns:
                 table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
             table_html += "</tr></thead><tbody>"
