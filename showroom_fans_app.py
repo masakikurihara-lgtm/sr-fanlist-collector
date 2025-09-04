@@ -12,21 +12,15 @@ st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide"
 
 # タイトル（スマホでもバランス良く調整）
 st.markdown(
-    """
-    <h1 style='font-size:28px; text-align:center; color:#1f2937;'>
-        SHOWROOM ファンリスト取得ツール
-    </h1>
-    """,
+    "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンリスト取得ツール</h1>",
     unsafe_allow_html=True
 )
 
 # 説明文
 st.markdown(
-    """
-    <p style='font-size:16px; text-align:center; color:#4b5563;'>
-        ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。
-    </p>
-    """,
+    "<p style='font-size:16px; text-align:center; color:#4b5563;'>"
+    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
+    "</p>",
     unsafe_allow_html=True
 )
 
@@ -45,7 +39,7 @@ months_list = list(range(start_month, current_month + 1))
 months_list.reverse()  # 最新月が先頭
 month_labels = [str(m) for m in months_list]
 
-# 月選択（複数可、チェック式）
+# 月選択（複数可）
 selected_months = st.multiselect(
     "取得したい月を選択",
     options=month_labels,
@@ -53,12 +47,7 @@ selected_months = st.multiselect(
 )
 
 # 月選択と実行ボタンの間に余白
-st.markdown(
-    """
-    <div style='margin-top:20px;'></div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 # ZIP作成用バッファ
 zip_buffer = BytesIO()
@@ -68,7 +57,6 @@ zip_file = ZipFile(zip_buffer, "w")
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
-
     if not room_id or not selected_months:
         st.warning("ルームIDと月を必ず選択してください。")
     else:
@@ -80,7 +68,7 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
-        all_fans_list = []  # すべての月のデータ格納用
+        all_month_data = []  # マージ用に全月データを格納
 
         # 総ファン数合計
         for month in selected_months:
@@ -94,11 +82,9 @@ if start_button:
                 monthly_counts[month] = 0
 
         st.markdown(
-            f"""
-            <div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>
-                <b>総ファン数合計:</b> {total_fans_overall} 件
-            </div>
-            """,
+            f"<div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>"
+            f"<b>総ファン数合計:</b> {total_fans_overall} 件"
+            f"</div>",
             unsafe_allow_html=True
         )
 
@@ -108,11 +94,9 @@ if start_button:
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
 
             st.markdown(
-                f"""
-                <div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>
-                    <h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>
-                </div>
-                """,
+                f"<div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>"
+                f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>"
+                f"</div>",
                 unsafe_allow_html=True
             )
 
@@ -161,7 +145,7 @@ if start_button:
 
             # DataFrameに変換して UTF-8 BOM 付きで保存
             df = pd.DataFrame(fans_data)
-            all_fans_list.append(df)  # 集計用に保持
+            all_month_data.append(df)  # マージ用に保存
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
@@ -173,39 +157,22 @@ if start_button:
             )
             month_progress.progress(1.0)
 
-        # マージファイル作成
-        if all_fans_list:
-            merged_df = pd.concat(all_fans_list, ignore_index=True)
-
-            # 必要項目だけ残して level を合計
-            merged_group = (
-                merged_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level']
-                .sum()
-            )
-
-            # title_id は level//5
+        # マージ集計ファイル作成
+        if all_month_data:
+            merged_df = pd.concat(all_month_data, ignore_index=True)
+            merged_group = merged_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             merged_group['title_id'] = (merged_group['level'] // 5).astype(int)
-
-            # カラム順を保持
             merged_group = merged_group[['avatar_id', 'level', 'title_id', 'user_id', 'user_name']]
 
-            # level 降順ソート
-            merged_group = merged_group.sort_values(by='level', ascending=False)
-
-            # マージファイルを ZIP に追加
-            csv_bytes = merged_group.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            zip_file.writestr(f"active_fans_{room_id}_merged.csv", csv_bytes)
+            # CSV出力
+            merged_csv_bytes = merged_group.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            zip_file.writestr(f"active_fans_{room_id}_merged.csv", merged_csv_bytes)
 
         zip_file.close()
         zip_buffer.seek(0)
 
-        # ZIPダウンロードボタン前の余白
-        st.markdown(
-            """
-            <div style='margin-top:20px;'></div>
-            """,
-            unsafe_allow_html=True
-        )
+        # ZIPダウンロードボタン前に余白
+        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
         st.download_button(
             label="ZIPをダウンロード",
@@ -214,46 +181,32 @@ if start_button:
             mime="application/zip"
         )
 
-        # --- 追加表示：マージ結果表（上位100位）
-        if all_fans_list:
-            st.markdown(
-                """
-                <h3 style='margin-top:30px;'>上位100位マージ結果（アバター・レベル合計値・ユーザー名）</h3>
-                """,
-                unsafe_allow_html=True
-            )
-
+        # --------------------------
+        # マージ結果を画面に表形式で表示（上位100位）
+        # --------------------------
+        if all_month_data:
             display_df = merged_group[['avatar_id', 'level', 'user_name']].copy()
             display_df = display_df.rename(columns={
                 'avatar_id': 'アバター',
                 'level': 'レベル合計値',
                 'user_name': 'ユーザー名'
             })
-
-            # 順位計算
             display_df['順位'] = display_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
-            display_df = display_df.sort_values(by=['レベル合計値', 'ユー名'], ascending=[False, True])
-
-            # 上位100位まで表示
             display_df = display_df[display_df['順位'] <= 100].copy()
 
-            # avatar_id を画像に変換
-            def avatar_img(aid):
-                return f"![avatar](https://static.showroom-live.com/image/avatar/{aid}.png)"
-
-            display_df['アバター'] = display_df['アバター'].apply(avatar_img)
+            # avatar_id を画像 URL に変換
+            display_df['アバター'] = display_df['アバター'].apply(
+                lambda aid: f"![avatar](https://static.showroom-live.com/image/avatar/{aid}.png)"
+            )
 
             # 順位を先頭カラムに移動
             cols = ['順位', 'アバター', 'レベル合計値', 'ユーザー名']
             display_df = display_df[cols]
 
-            # Markdown で表形式に表示
-            st.markdown(
-                display_df.to_markdown(index=False, tablefmt="github"),
-                unsafe_allow_html=True
-            )
+            # ソート
+            display_df = display_df.sort_values(by=['レベル合計値', 'ユーザー名'], ascending=[False, True])
 
-            st.markdown(
-                "<p style='font-size:12px;'>※上位100位まで表示しています</p>",
-                unsafe_allow_html=True
-            )
+            st.markdown("<hr>", unsafe_allow_html=True)
+            st.markdown("<h3>マージ集計結果（上位100位）</h3>", unsafe_allow_html=True)
+            st.markdown(display_df.to_markdown(index=False, tablefmt="github"), unsafe_allow_html=True)
+            st.markdown("<p style='font-size:12px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
