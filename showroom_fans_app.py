@@ -28,7 +28,7 @@ st.markdown("---")
 # ルームID入力
 room_id = st.text_input("対象のルームID（例：481475）", value="")
 
-# 月の範囲（最新月が上に来る）
+# 月の範囲
 start_month = 202501
 current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
@@ -41,11 +41,11 @@ selected_months = st.multiselect("取得したい月を選択", options=month_la
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
-# ZIPバッファ（セッション状態で保持して画面が消えないように）
+# セッションにZIPバッファを保持して画面表示を消さない
 if 'zip_buffer' not in st.session_state:
     st.session_state.zip_buffer = None
 
-# 実行ボタン（左寄せ）
+# 実行ボタン
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
@@ -70,11 +70,12 @@ if start_button:
             else:
                 monthly_counts[month] = 0
 
-        # 月ごとの取得
-        all_fans_data = []  # マージ用
+        # ZIP作成用
         zip_buffer = BytesIO()
         zip_file = ZipFile(zip_buffer, "w")
+        all_fans_data = []  # マージ用
 
+        # 各月データ取得
         for idx, month in enumerate(selected_months):
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
             st.markdown(
@@ -83,7 +84,6 @@ if start_button:
                 f"</div>",
                 unsafe_allow_html=True
             )
-
             col_text, col_bar = st.columns([3, 1])
             with col_text:
                 month_text = st.empty()
@@ -117,12 +117,9 @@ if start_button:
                 processed_fans += len(users)
                 overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
                 overall_text.markdown(
-                    f"<p style='font-size:14px; color:#1f2937;'>"
-                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
-                    f"</p>",
+                    f"<p style='font-size:14px; color:#1f2937;'>全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)</p>",
                     unsafe_allow_html=True
                 )
-
                 time.sleep(0.05)
 
             # CSV作成（各月）
@@ -156,6 +153,7 @@ if start_button:
             agg_df = agg_df[['avatar_id','level','title_id','user_id','user_name']]
             agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
 
+            # マージCSV書き込み
             merge_csv_bytes = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
@@ -170,7 +168,7 @@ if start_button:
         zip_buffer.seek(0)
         st.session_state.zip_buffer = zip_buffer  # セッションに保持
 
-# ZIPダウンロード（進捗情報を消さないように）
+# ZIPダウンロード（画面表示消えない）
 if st.session_state.zip_buffer is not None:
     st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
     st.download_button(
