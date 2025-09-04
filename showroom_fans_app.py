@@ -182,18 +182,11 @@ if start_button:
 
             # ---------- 表示 ----------
             st.markdown(
-                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
+                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px; "
+                "background-color:#f0f9ff; padding:4px; border-radius:4px;'>"
                 "マージ集計（上位100位）</h3>",
                 unsafe_allow_html=True
             )
-
-            # テーブルスタイル
-            def style_table(df):
-                return df.style.set_table_styles([
-                    {'selector': 'th', 'props': [('text-align', 'center')]},
-                    {'selector': 'td', 'props': [('text-align', 'center')]},
-                    {'selector': 'td.col4', 'props': [('text-align', 'left')]},  # ユーザー名左寄せ
-                ])
 
             # HTML表作成
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
