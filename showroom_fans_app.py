@@ -59,7 +59,7 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
-        # 総ファン数（各月取得のためだけ）
+        # 総ファン数（マージ用）
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
             resp = requests.get(url)
@@ -122,6 +122,7 @@ if start_button:
 
                 time.sleep(0.05)
 
+            # CSV作成
             df = pd.DataFrame(fans_data)
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
@@ -141,34 +142,89 @@ if start_button:
                 f"</div>",
                 unsafe_allow_html=True
             )
-
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
             merge_df = pd.DataFrame(all_fans_data)
-            agg_df = merge_df.groupby(['avatar_id','user_id','user_name'], as_index=False)['level'].sum()
+            agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
-            agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
+            agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # 進捗は簡易パーセント更新のみ
-            merge_text.markdown(f"<p style='font-size:14px; color:#374151;'>処理中…</p>", unsafe_allow_html=True)
-            merge_progress.progress(1.0)
+            # マージCSV書き込み
+            merge_csv_rows = len(agg_df)
+            merge_csv_buffer = BytesIO()
+            temp_csv_bytes = []
 
-            # CSV生成
-            merge_csv_bytes = agg_df[['avatar_id','level','title_id','user_id','user_name']].to_csv(
-                index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            for i, row in agg_df.iterrows():
+                temp_df = pd.DataFrame([row])
+                temp_csv_bytes.append(temp_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"))
+                merge_progress.progress((i + 1) / merge_csv_rows)
+                merge_text.markdown(
+                    f"<p style='font-size:14px; color:#374151;'>{i+1}/{merge_csv_rows} 件マージ中…</p>",
+                    unsafe_allow_html=True
+                )
+                time.sleep(0.01)
+
+            merge_csv_bytes = b"".join(temp_csv_bytes)
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
 
         zip_file.close()
         zip_buffer.seek(0)
 
-        # ZIPダウンロード前余白
+        # ZIPダウンロード
         st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-
         st.download_button(
             label="ZIPをダウンロード",
             data=zip_buffer,
             file_name=f"active_fans_{room_id}.zip",
             mime="application/zip"
         )
+
+        # ---------- マージ集計表示 ----------
+        if all_fans_data:
+            agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
+            agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
+
+            # 順位計算
+            agg_df['順位'] = 0
+            last_level = None
+            rank = 0
+            for i, row in agg_df.iterrows():
+                if row['level'] != last_level:
+                    rank = i + 1
+                    last_level = row['level']
+                agg_df.at[i, '順位'] = rank
+            agg_df = agg_df[agg_df['順位'] <= 100]
+
+            display_df = agg_df[['順位','avatar_id','level','user_name']]
+            display_df.rename(columns={
+                'avatar_id': 'アバター',
+                'level': 'レベル合計値',
+                'user_name': 'ユーザー名'
+            }, inplace=True)
+
+            # 表示タイトル
+            st.markdown(
+                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
+                "マージ集計（上位100位）</h3>",
+                unsafe_allow_html=True
+            )
+
+            # HTML表作成
+            table_html = "<table style='width:100%; border-collapse:collapse;'>"
+            table_html += "<thead><tr style='background-color:#f3f4f6;'>"
+            for col in display_df.columns:
+                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
+            table_html += "</tr></thead><tbody>"
+            for idx, row in display_df.iterrows():
+                table_html += "<tr>"
+                table_html += f"<td style='text-align:center;'>{row['順位']}</td>"
+                table_html += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='40'></td>"
+                table_html += f"<td style='text-align:center;'>{row['レベル合計値']}</td>"
+                table_html += f"<td style='text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
+                table_html += "</tr>"
+            table_html += "</tbody></table>"
+
+            st.markdown(table_html, unsafe_allow_html=True)
+            st.markdown("<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
