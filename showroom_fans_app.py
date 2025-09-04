@@ -45,11 +45,14 @@ selected_months = st.multiselect(
     default=[]
 )
 
+# 月選択とボタンの間に余白を追加
+st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+
 # ZIP作成用バッファ
 zip_buffer = BytesIO()
 zip_file = ZipFile(zip_buffer, "w")
 
-# 実行ボタン（左寄せに修正）
+# 実行ボタン（左寄せ）
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
