@@ -6,36 +6,56 @@ from zipfile import ZipFile
 from datetime import datetime
 import time
 
-st.set_page_config(page_title="Showroom アクティブファン取得", layout="wide")
+# ページ設定
+st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
 
-st.title("SHOWROOM ファンリスト取得ツール")
+# タイトル（スマホでもバランス良く調整）
 st.markdown(
-    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
+    "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンリスト取得ツール</h1>",
+    unsafe_allow_html=True
 )
 
-# ルームID入力
-room_id = st.text_input("対象のルームIDを入力してください", value="")
+# 説明文
+st.markdown(
+    "<p style='font-size:16px; text-align:center; color:#4b5563;'>"
+    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
+    "</p>",
+    unsafe_allow_html=True
+)
 
-# 月の範囲（最新月が上に来るようにソート） ← 修正
+st.markdown("---")  # 区切り線
+
+# ルームID入力
+room_id = st.text_input(
+    "対象のルームIDを入力してください",
+    value="",
+    help="例：481475"
+)
+
+# 月の範囲（最新月が上に来るようにソート）
 start_month = 202501
 current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
 months_list.reverse()  # 最新月が先頭
 month_labels = [str(m) for m in months_list]
 
-# 月選択（複数可）
+# 月選択（複数可、チェック式）
 selected_months = st.multiselect(
     "取得したい月を選択",
     options=month_labels,
-    default=[]  # 初期値は空にして、取得したい月だけチェック
+    default=[]
 )
 
-# ZIP作成用
+# ZIP作成用バッファ
 zip_buffer = BytesIO()
 zip_file = ZipFile(zip_buffer, "w")
 
-# 実行ボタン
-if st.button("データ取得 & ZIP作成"):
+# 実行ボタン（中央表示）
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    start_button = st.button("データ取得 & ZIP作成")
+
+if start_button:
 
     if not room_id or not selected_months:
         st.warning("ルームIDと月を必ず選択してください。")
@@ -59,13 +79,27 @@ if st.button("データ取得 & ZIP作成"):
             else:
                 monthly_counts[month] = 0
 
-        st.write(f"総ファン数合計: {total_fans_overall}")
+        st.markdown(
+            f"<div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>"
+            f"<b>総ファン数合計:</b> {total_fans_overall} 件"
+            f"</div>",
+            unsafe_allow_html=True
+        )
 
         # 月ごとに取得
         for month in selected_months:
-            st.subheader(f"{month} の処理")
-            month_progress = st.progress(0)
-            month_text = st.empty()
+            # サブタイトル（スマホでも見やすく）
+            st.markdown(
+                f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>",
+                unsafe_allow_html=True
+            )
+
+            # 進捗表示
+            col_text, col_bar = st.columns([3, 1])
+            with col_text:
+                month_text = st.empty()
+            with col_bar:
+                month_progress = st.progress(0)
 
             fans_data = []
             count = monthly_counts[month]
@@ -86,13 +120,19 @@ if st.button("データ取得 & ZIP作成"):
                 # 月ごと進捗更新
                 if count > 0:
                     month_progress.progress(min(retrieved / count, 1.0))
-                    month_text.text(f"{retrieved}/{count} 件取得中…")
+                    month_text.markdown(
+                        f"<p style='font-size:14px; color:#374151;'>{retrieved}/{count} 件取得中…</p>",
+                        unsafe_allow_html=True
+                    )
 
                 # 全体進捗更新
                 processed_fans += len(users)
                 overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
-                overall_text.text(
+                overall_text.markdown(
+                    f"<p style='font-size:14px; color:#1f2937;'>"
                     f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
+                    f"</p>",
+                    unsafe_allow_html=True
                 )
 
                 time.sleep(0.05)
@@ -103,13 +143,16 @@ if st.button("データ取得 & ZIP作成"):
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
 
-            # 処理完了後に表示更新
-            month_text.text(f"{month} の取得完了 ({len(fans_data)} 件)")
+            # 月処理完了表示
+            month_text.markdown(
+                f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
+                unsafe_allow_html=True
+            )
             month_progress.progress(1.0)
-            st.success(f"{month} のCSV保存完了 ({len(fans_data)} 件)")
 
         zip_file.close()
         zip_buffer.seek(0)
+
         st.download_button(
             label="ZIPをダウンロード",
             data=zip_buffer,
