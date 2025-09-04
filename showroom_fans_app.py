@@ -197,13 +197,12 @@ if start_button:
                 'user_name': 'ユーザー名'
             }, inplace=True)
 
-            # HTMLテーブル作成（列ごとの整列）
+            # HTMLテーブル作成（列ごとの整列、ヘッダーもセンタリング）
             html_table = '<table style="border-collapse: collapse; width: 100%; font-size:14px;">'
             # ヘッダー
             html_table += '<tr style="background-color:#f3f4f6;">'
             for col in display_df.columns:
-                align = 'center' if col != 'ユーザー名' else 'left'
-                html_table += f'<th style="border: 1px solid #ddd; padding: 8px; text-align:{align};">{col}</th>'
+                html_table += f'<th style="border: 1px solid #ddd; padding: 8px; text-align:center;">{col}</th>'
             html_table += '</tr>'
             # 行
             for _, row in display_df.iterrows():
