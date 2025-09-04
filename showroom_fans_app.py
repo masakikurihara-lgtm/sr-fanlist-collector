@@ -8,11 +8,11 @@ import time
 
 st.set_page_config(page_title="Showroom アクティブファン取得", layout="wide")
 
-st.title("Showroom アクティブファン取得ツール（公開版）")
+st.title("SHOWROOM ファンリスト取得ツール")
 st.markdown("ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。")
 
 # ルームID入力
-room_id = st.text_input("対象のルームIDを入力してください", value="481475")
+room_id = st.text_input("対象のルームIDを入力してください", value="")
 
 # 月の範囲
 start_month = 202501
