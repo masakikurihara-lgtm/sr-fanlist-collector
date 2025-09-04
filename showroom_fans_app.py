@@ -9,7 +9,9 @@ import time
 st.set_page_config(page_title="Showroom アクティブファン取得", layout="wide")
 
 st.title("SHOWROOM ファンリスト取得ツール")
-st.markdown("ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。")
+st.markdown(
+    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
+)
 
 # ルームID入力
 room_id = st.text_input("対象のルームIDを入力してください", value="")
@@ -20,8 +22,12 @@ current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
 month_labels = [str(m) for m in months_list]
 
-# 月選択（複数可）
-selected_months = st.multiselect("取得したい月を選択", options=month_labels, default=month_labels)
+# 月選択（複数可） ← 修正①
+selected_months = st.multiselect(
+    "取得したい月を選択",
+    options=month_labels,
+    default=[]  # 初期値は空、取得したい月だけチェック
+)
 
 # ZIP作成用
 zip_buffer = BytesIO()
@@ -56,7 +62,7 @@ if st.button("データ取得 & ZIP作成"):
 
         # 月ごとに取得
         for month in selected_months:
-            st.subheader(f"{month} を処理中")
+            st.subheader(f"{month} の処理")
             month_progress = st.progress(0)
             month_text = st.empty()
 
@@ -84,7 +90,9 @@ if st.button("データ取得 & ZIP作成"):
                 # 全体進捗更新
                 processed_fans += len(users)
                 overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
-                overall_text.text(f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)")
+                overall_text.text(
+                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
+                )
 
                 time.sleep(0.05)
 
@@ -93,6 +101,10 @@ if st.button("データ取得 & ZIP作成"):
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
+
+            # 修正②：処理完了後に表示を更新
+            month_text.text(f"{month} の取得完了 ({len(fans_data)} 件)")
+            month_progress.progress(1.0)
             st.success(f"{month} のCSV保存完了 ({len(fans_data)} 件)")
 
         zip_file.close()
