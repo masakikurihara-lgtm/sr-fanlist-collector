@@ -16,17 +16,18 @@ st.markdown(
 # ルームID入力
 room_id = st.text_input("対象のルームIDを入力してください", value="")
 
-# 月の範囲
+# 月の範囲（最新月が上に来るようにソート） ← 修正
 start_month = 202501
 current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
+months_list.reverse()  # 最新月が先頭
 month_labels = [str(m) for m in months_list]
 
-# 月選択（複数可） ← 修正①
+# 月選択（複数可）
 selected_months = st.multiselect(
     "取得したい月を選択",
     options=month_labels,
-    default=[]  # 初期値は空、取得したい月だけチェック
+    default=[]  # 初期値は空にして、取得したい月だけチェック
 )
 
 # ZIP作成用
@@ -102,7 +103,7 @@ if st.button("データ取得 & ZIP作成"):
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
 
-            # 修正②：処理完了後に表示を更新
+            # 処理完了後に表示更新
             month_text.text(f"{month} の取得完了 ({len(fans_data)} 件)")
             month_progress.progress(1.0)
             st.success(f"{month} のCSV保存完了 ({len(fans_data)} 件)")
