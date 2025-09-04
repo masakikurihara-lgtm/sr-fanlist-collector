@@ -25,12 +25,17 @@ st.markdown(
 
 st.markdown("---")  # 区切り線
 
-# ルームID入力
-room_id = st.text_input(
-    "対象のルームIDを入力してください",
-    value="",
-    help="例：481475"
+# ルームID入力欄（例表示を改行させない）
+st.markdown(
+    """
+    <label style="font-size:14px; color:#4b5563;">
+        対象のルームIDを入力してください
+        <span style="white-space:nowrap; color:#6b7280; font-size:12px;">（例：481475）</span>
+    </label>
+    """,
+    unsafe_allow_html=True
 )
+room_id = st.text_input("", value="")
 
 # 月の範囲（最新月が上に来る）
 start_month = 202501
@@ -50,7 +55,7 @@ selected_months = st.multiselect(
 zip_buffer = BytesIO()
 zip_file = ZipFile(zip_buffer, "w")
 
-# 実行ボタン（左寄せに修正）
+# 実行ボタン（左寄せ）
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
