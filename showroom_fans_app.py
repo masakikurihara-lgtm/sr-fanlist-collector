@@ -59,7 +59,7 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
-        # 各月の総ファン数を取得
+        # 総ファン数取得
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
             resp = requests.get(url)
@@ -70,7 +70,7 @@ if start_button:
             else:
                 monthly_counts[month] = 0
 
-        # 各月のデータ取得
+        # 各月のデータ取得（既存仕様）
         all_fans_data = []  # マージ用
         for idx, month in enumerate(selected_months):
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
@@ -121,10 +121,9 @@ if start_button:
                 )
                 time.sleep(0.05)
 
-            # 月別CSV作成
+            # 月別CSV作成（既存仕様を変更なし）
             df = pd.DataFrame(fans_data)
-            # 列順を固定
-            df = df[['avatar_id','user_id','user_name','level']]
+            df = df[['avatar_id','user_id','user_name','level']]  # 列順固定
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
@@ -135,7 +134,7 @@ if start_button:
             )
             month_progress.progress(1.0)
 
-        # ---------- マージCSV作成 ----------
+        # ---------- マージCSV作成（既存処理に影響せず） ----------
         if all_fans_data:
             st.markdown(
                 f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:10px;'>"
@@ -146,15 +145,14 @@ if start_button:
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
-            # ユーザー単位で集計
+            # マージCSV生成（仕様どおり）
             merge_df = pd.DataFrame(all_fans_data)
             agg_df = merge_df.groupby(['avatar_id','user_id','user_name'], as_index=False)['level'].sum()
-            # 列順を月別CSVに合わせる
-            agg_df = agg_df[['avatar_id','user_id','user_name','level']]
+            agg_df = agg_df[['avatar_id','user_id','user_name','level']]  # 列順固定
             merge_csv_bytes = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             zip_file.writestr(f"active_fans_{room_id}_merge.csv", merge_csv_bytes)
 
-            # 進捗表示（単純に1行ずつ）
+            # 進捗表示（行単位）
             total_rows = len(agg_df)
             for i in range(total_rows):
                 merge_progress.progress((i+1)/total_rows)
@@ -216,6 +214,5 @@ if start_button:
                 table_html += f"<td style='text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
                 table_html += "</tr>"
             table_html += "</tbody></table>"
-
             st.markdown(table_html, unsafe_allow_html=True)
             st.markdown("<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
