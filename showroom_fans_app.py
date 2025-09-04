@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import numpy as np
 from io import BytesIO
 from zipfile import ZipFile
 from datetime import datetime
@@ -36,16 +35,13 @@ if st.button("データ取得 & ZIP作成"):
     else:
         st.info(f"{len(selected_months)}か月分のデータを取得します。")
 
-        total_fans_count = 0
         monthly_counts = {}
-
-        # 全体進捗表示
         overall_progress = st.progress(0)
         overall_text = st.empty()
         processed_fans = 0
         total_fans_overall = 0
 
-        # まず総ファン数を合計
+        # 総ファン数合計
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
             resp = requests.get(url)
@@ -90,11 +86,11 @@ if st.button("データ取得 & ZIP作成"):
                 overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
                 overall_text.text(f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)")
 
-                time.sleep(0.05)  # アニメーションの見やすさ調整
+                time.sleep(0.05)
 
-            # DataFrameに変換
+            # DataFrameに変換して UTF-8 BOM 付きで保存
             df = pd.DataFrame(fans_data)
-            csv_bytes = df.to_csv(index=False, encoding="utf-8").encode("utf-8")
+            csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
             zip_file.writestr(csv_name, csv_bytes)
             st.success(f"{month} のCSV保存完了 ({len(fans_data)} 件)")
