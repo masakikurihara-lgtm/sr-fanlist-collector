@@ -45,7 +45,7 @@ selected_months = st.multiselect(
     default=[]
 )
 
-# 月選択とボタンの間に余白を追加
+# 月選択と実行ボタンの間に余白を追加
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 # ZIP作成用バッファ
@@ -156,6 +156,9 @@ if start_button:
 
         zip_file.close()
         zip_buffer.seek(0)
+
+        # ZIPダウンロードボタンの前に余白を追加
+        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
         st.download_button(
             label="ZIPをダウンロード",
