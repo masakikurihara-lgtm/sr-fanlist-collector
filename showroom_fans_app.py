@@ -1,208 +1,259 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>Showroom Data Fetcher</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        label {
-            margin-right: 10px;
-        }
-        select {
-            margin-right: 10px;
-        }
-        button {
-            margin-top: 20px;
-        }
-        #downloadZipBtn {
-            margin-top: 30px;
-        }
-        table {
-            border-collapse: collapse;
-            margin-top: 30px;
-            width: 100%;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
-        }
-        th, td {
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background: #f2f2f2;
-        }
-        img.avatar {
-            width: 50px;
-            height: 50px;
-        }
-        .note {
-            margin-top: 5px;
-            font-size: 0.9em;
-            color: #555;
-            text-align: left;
-        }
-    </style>
-</head>
-<body>
-    <h1>Showroom Data Fetcher</h1>
-    <div>
-        <label for="monthSelect">月を選択:</label>
-        <select id="monthSelect">
-            <option value="202501">2025年01月</option>
-            <option value="202502">2025年02月</option>
-            <option value="202503">2025年03月</option>
-        </select>
-        <button id="fetchBtn">データ取得 & ZIP作成</button>
-    </div>
-    <button id="downloadZipBtn" style="display:none;">ZIPをダウンロード</button>
+import streamlit as st
+import requests
+import pandas as pd
+from io import BytesIO
+from zipfile import ZipFile
+from datetime import datetime
+import time
+import math
 
-    <div id="mergeTableContainer"></div>
+# ページ設定
+st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
 
-    <script>
-        const fetchBtn = document.getElementById("fetchBtn");
-        const downloadZipBtn = document.getElementById("downloadZipBtn");
-        const mergeTableContainer = document.getElementById("mergeTableContainer");
+# タイトル（スマホでもバランス良く調整）
+st.markdown(
+    """
+    <h1 style='font-size:28px; text-align:center; color:#1f2937;'>
+        SHOWROOM ファンリスト取得ツール
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
 
-        let fetchedData = {}; // 月ごとのデータ保持
-        let zipBlob = null;
+# 説明文
+st.markdown(
+    """
+    <p style='font-size:16px; text-align:center; color:#4b5563;'>
+        ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。
+    </p>
+    """,
+    unsafe_allow_html=True
+)
 
-        fetchBtn.addEventListener("click", async () => {
-            const month = document.getElementById("monthSelect").value;
-            // ダミーデータ生成
-            const data = [
-                { avatar_id: "1001", level: 10, title_id: 2, user_id: "u001", user_name: "ユーザーA" },
-                { avatar_id: "1002", level: 15, title_id: 3, user_id: "u002", user_name: "ユーザーB" },
-                { avatar_id: "1003", level: 7,  title_id: 1, user_id: "u003", user_name: "ユーザーC" }
-            ];
-            fetchedData[month] = data;
+st.markdown("---")  # 区切り線
 
-            await createZip();
-            createMergeAndShow();
-        });
+# ルームID入力（例をラベルに直接記載）
+room_id = st.text_input(
+    "対象のルームID（例：481475）",
+    value=""
+)
 
-        async function createZip() {
-            const zip = new JSZip();
+# 月の範囲（最新月が上に来る）
+start_month = 202501
+current_month = int(datetime.now().strftime("%Y%m"))
+months_list = list(range(start_month, current_month + 1))
+months_list.reverse()  # 最新月が先頭
+month_labels = [str(m) for m in months_list]
 
-            // 各月ファイル作成
-            for (const [month, data] of Object.entries(fetchedData)) {
-                const header = ["avatar_id", "level", "title_id", "user_id", "user_name"];
-                const csvRows = [header.join(",")];
-                data.forEach(row => {
-                    csvRows.push([row.avatar_id, row.level, row.title_id, row.user_id, row.user_name].join(","));
-                });
-                zip.file(`${month}.csv`, csvRows.join("\n"));
-            }
+# 月選択（複数可、チェック式）
+selected_months = st.multiselect(
+    "取得したい月を選択",
+    options=month_labels,
+    default=[]
+)
 
-            // マージファイル作成
-            const merged = {};
-            for (const data of Object.values(fetchedData)) {
-                for (const row of data) {
-                    if (!merged[row.user_id]) {
-                        merged[row.user_id] = { ...row };
-                    } else {
-                        merged[row.user_id].level += row.level;
-                    }
-                }
-            }
-            // title_id 計算
-            for (const row of Object.values(merged)) {
-                row.title_id = Math.floor(row.level / 5);
-            }
-            const mergedArray = Object.values(merged).sort((a, b) => b.level - a.level);
+# 月選択と実行ボタンの間に余白
+st.markdown(
+    """
+    <div style='margin-top:20px;'></div>
+    """,
+    unsafe_allow_html=True
+)
 
-            const header = ["avatar_id", "level", "title_id", "user_id", "user_name"];
-            const csvRows = [header.join(",")];
-            mergedArray.forEach(row => {
-                csvRows.push([row.avatar_id, row.level, row.title_id, row.user_id, row.user_name].join(","));
-            });
-            zip.file(`merged.csv`, csvRows.join("\n"));
+# ZIP作成用バッファ
+zip_buffer = BytesIO()
+zip_file = ZipFile(zip_buffer, "w")
 
-            zipBlob = await zip.generateAsync({ type: "blob" });
-            downloadZipBtn.style.display = "inline-block";
-        }
+# 実行ボタン（左寄せ）
+start_button = st.button("データ取得 & ZIP作成")
 
-        function createMergeAndShow() {
-            // マージ処理
-            const merged = {};
-            for (const data of Object.values(fetchedData)) {
-                for (const row of data) {
-                    if (!merged[row.user_id]) {
-                        merged[row.user_id] = { ...row };
-                    } else {
-                        merged[row.user_id].level += row.level;
-                    }
-                }
-            }
-            for (const row of Object.values(merged)) {
-                row.title_id = Math.floor(row.level / 5);
-            }
-            const mergedArray = Object.values(merged).sort((a, b) => b.level - a.level);
+if start_button:
 
-            // 順位付け
-            let displayData = [];
-            let lastLevel = null;
-            let lastRank = 0;
-            let count = 0;
+    if not room_id or not selected_months:
+        st.warning("ルームIDと月を必ず選択してください。")
+    else:
+        st.info(f"{len(selected_months)}か月分のデータを取得します。")
 
-            for (let i = 0; i < mergedArray.length; i++) {
-                const row = mergedArray[i];
-                if (row.level !== lastLevel) {
-                    lastRank = i + 1;
-                    lastLevel = row.level;
-                }
-                if (lastRank > 100) break; // 100位まで
-                displayData.push({
-                    rank: lastRank,
-                    avatar_id: row.avatar_id,
-                    level: row.level,
-                    user_name: row.user_name
-                });
-                count++;
-            }
+        monthly_counts = {}
+        overall_progress = st.progress(0)
+        overall_text = st.empty()
+        processed_fans = 0
+        total_fans_overall = 0
 
-            // テーブル作成
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>順位</th>
-                            <th>アバター</th>
-                            <th>レベル合計値</th>
-                            <th>ユーザー名</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            displayData.forEach(row => {
-                html += `
-                    <tr>
-                        <td>${row.rank}</td>
-                        <td><img class="avatar" src="https://static.showroom-live.com/image/avatar/${row.avatar_id}.png" alt="avatar"></td>
-                        <td>${row.level}</td>
-                        <td>${row.user_name}</td>
-                    </tr>
-                `;
-            });
-            html += `</tbody></table>`;
-            html += `<div class="note">※100位まで表示しています</div>`;
-            mergeTableContainer.innerHTML = html;
-        }
+        all_fans_list = []  # すべての月のデータ格納用
 
-        downloadZipBtn.addEventListener("click", () => {
-            if (zipBlob) {
-                const url = URL.createObjectURL(zipBlob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "data.zip";
-                a.click();
-                URL.revokeObjectURL(url);
-            }
-        });
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-</body>
-</html>
+        # 総ファン数合計
+        for month in selected_months:
+            url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
+            resp = requests.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                monthly_counts[month] = data.get("count", 0)
+                total_fans_overall += monthly_counts[month]
+            else:
+                monthly_counts[month] = 0
+
+        st.markdown(
+            f"""
+            <div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>
+                <b>総ファン数合計:</b> {total_fans_overall} 件
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # 月ごとに取得
+        for idx, month in enumerate(selected_months):
+            # 月ごとの背景色（交互）
+            bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
+
+            st.markdown(
+                f"""
+                <div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>
+                    <h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # 進捗表示
+            col_text, col_bar = st.columns([3, 1])
+            with col_text:
+                month_text = st.empty()
+            with col_bar:
+                month_progress = st.progress(0)
+
+            fans_data = []
+            count = monthly_counts[month]
+            per_page = 50
+            retrieved = 0
+
+            while retrieved < count:
+                url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}&offset={retrieved}&limit={per_page}"
+                resp = requests.get(url)
+                if resp.status_code != 200:
+                    st.error(f"{month} の取得でエラー発生")
+                    break
+                data = resp.json()
+                users = data.get("users", [])
+                fans_data.extend(users)
+                retrieved += len(users)
+
+                # 月ごと進捗更新
+                if count > 0:
+                    month_progress.progress(min(retrieved / count, 1.0))
+                    month_text.markdown(
+                        f"<p style='font-size:14px; color:#374151;'>{retrieved}/{count} 件取得中…</p>",
+                        unsafe_allow_html=True
+                    )
+
+                # 全体進捗更新
+                processed_fans += len(users)
+                overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
+                overall_text.markdown(
+                    f"<p style='font-size:14px; color:#1f2937;'>"
+                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
+                    f"</p>",
+                    unsafe_allow_html=True
+                )
+
+                time.sleep(0.05)
+
+            # DataFrameに変換して UTF-8 BOM 付きで保存
+            df = pd.DataFrame(fans_data)
+            all_fans_list.append(df)  # 集計用に保持
+            csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            csv_name = f"active_fans_{room_id}_{month}.csv"
+            zip_file.writestr(csv_name, csv_bytes)
+
+            # 月処理完了表示
+            month_text.markdown(
+                f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
+                unsafe_allow_html=True
+            )
+            month_progress.progress(1.0)
+
+        # マージファイル作成
+        if all_fans_list:
+            merged_df = pd.concat(all_fans_list, ignore_index=True)
+
+            # 必要項目だけ残して level を合計
+            merged_group = (
+                merged_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level']
+                .sum()
+            )
+
+            # title_id は level//5
+            merged_group['title_id'] = (merged_group['level'] // 5).astype(int)
+
+            # カラム順を保持
+            merged_group = merged_group[['avatar_id', 'level', 'title_id', 'user_id', 'user_name']]
+
+            # level 降順ソート
+            merged_group = merged_group.sort_values(by='level', ascending=False)
+
+            # マージファイルを ZIP に追加
+            csv_bytes = merged_group.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            zip_file.writestr(f"active_fans_{room_id}_merged.csv", csv_bytes)
+
+        zip_file.close()
+        zip_buffer.seek(0)
+
+        # ZIPダウンロードボタン前の余白
+        st.markdown(
+            """
+            <div style='margin-top:20px;'></div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.download_button(
+            label="ZIPをダウンロード",
+            data=zip_buffer,
+            file_name=f"active_fans_{room_id}.zip",
+            mime="application/zip"
+        )
+
+        # --- 追加表示：マージ結果表（上位100位）
+        if all_fans_list:
+            st.markdown(
+                """
+                <h3 style='margin-top:30px;'>上位100位マージ結果（アバター・レベル合計値・ユーザー名）</h3>
+                """,
+                unsafe_allow_html=True
+            )
+
+            display_df = merged_group[['avatar_id', 'level', 'user_name']].copy()
+            display_df = display_df.rename(columns={
+                'avatar_id': 'アバター',
+                'level': 'レベル合計値',
+                'user_name': 'ユーザー名'
+            })
+
+            # 順位計算
+            display_df['順位'] = display_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
+            display_df = display_df.sort_values(by=['レベル合計値', 'ユー名'], ascending=[False, True])
+
+            # 上位100位まで表示
+            display_df = display_df[display_df['順位'] <= 100].copy()
+
+            # avatar_id を画像に変換
+            def avatar_img(aid):
+                return f"![avatar](https://static.showroom-live.com/image/avatar/{aid}.png)"
+
+            display_df['アバター'] = display_df['アバター'].apply(avatar_img)
+
+            # 順位を先頭カラムに移動
+            cols = ['順位', 'アバター', 'レベル合計値', 'ユーザー名']
+            display_df = display_df[cols]
+
+            # Markdown で表形式に表示
+            st.markdown(
+                display_df.to_markdown(index=False, tablefmt="github"),
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                "<p style='font-size:12px;'>※上位100位まで表示しています</p>",
+                unsafe_allow_html=True
+            )
