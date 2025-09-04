@@ -156,11 +156,12 @@ if start_button:
         # ---------- マージ集計表示 ----------
         if all_fans_data:
             merge_df = pd.DataFrame(all_fans_data)
+            # 集計
             agg_df = merge_df.groupby(['avatar_id', 'user_id', 'user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
             agg_df = agg_df.sort_values(by=['level', 'user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # 順位計算
+            # 順位計算（同じレベルは同順位）
             agg_df['順位'] = 0
             last_level = None
             rank = 0
@@ -171,6 +172,26 @@ if start_button:
                 agg_df.at[i, '順位'] = rank
             agg_df = agg_df[agg_df['順位'] <= 100]
 
+            # ---------- マージ進捗バー ----------
+            merge_text = st.empty()
+            merge_progress = st.progress(0)
+            total_rows = len(agg_df)
+            for i, row in agg_df.iterrows():
+                # 進捗更新
+                merge_progress.progress((i+1)/total_rows)
+                merge_text.markdown(
+                    f"<p style='font-size:14px; color:#374151;'>{i+1}/{total_rows} 件マージ集計中…</p>",
+                    unsafe_allow_html=True
+                )
+                time.sleep(0.01)  # 表示のための僅かな待機
+
+            merge_text.markdown(
+                f"<p style='font-size:14px; color:#10b981;'><b>マージ集計完了 ({total_rows} 件)</b></p>",
+                unsafe_allow_html=True
+            )
+            merge_progress.progress(1.0)
+
+            # 表示用列順
             display_df = agg_df[['順位','avatar_id','level','user_name']]
             display_df.rename(columns={
                 'avatar_id': 'アバター',
@@ -185,11 +206,11 @@ if start_button:
                 unsafe_allow_html=True
             )
 
-            # HTML表作成（ヘッダー背景色を薄めに変更）
+            # ヘッダー背景を薄めの色に変更
             table_html = "<table style='width:100%; border-collapse:collapse;'>"
-            table_html += "<thead><tr>"
+            table_html += "<thead><tr style='background-color:#f3f4f6;'>"
             for col in display_df.columns:
-                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center; background-color:#f0f9ff;'>{col}</th>"
+                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
             table_html += "</tr></thead><tbody>"
             for idx, row in display_df.iterrows():
                 table_html += "<tr>"
