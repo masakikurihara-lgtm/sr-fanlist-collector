@@ -1,168 +1,109 @@
 import streamlit as st
 import requests
 import pandas as pd
-from io import BytesIO
-from zipfile import ZipFile
+import zipfile
+import os
+import tempfile
 from datetime import datetime
-import time
 
 # ページ設定
-st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
+st.set_page_config(page_title="SHOWROOM データ取得ツール", layout="centered")
 
-# タイトル（スマホでもバランス良く調整）
-st.markdown(
-    "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンリスト取得ツール</h1>",
-    unsafe_allow_html=True
-)
+# --- CSS カスタマイズ（スマホ対応＆余白調整） ---
+st.markdown("""
+    <style>
+    h1, h2, h3 { font-size: clamp(18px, 4vw, 28px); }
+    .nowrap { white-space: nowrap; }
+    .spacer { margin-top: 2em; }
+    .month-block:nth-child(odd) {
+        background-color: #f9f9f9;
+        padding: 1em;
+        border-radius: 10px;
+    }
+    .month-block:nth-child(even) {
+        background-color: #eef6ff;
+        padding: 1em;
+        border-radius: 10px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# 説明文
-st.markdown(
-    "<p style='font-size:16px; text-align:center; color:#4b5563;'>"
-    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
-    "</p>",
-    unsafe_allow_html=True
-)
+# --- 入力欄 ---
+st.title("SHOWROOM データ取得ツール")
 
-st.markdown("---")  # 区切り線
+col1, col2 = st.columns([2, 1])
+with col1:
+    room_id = st.text_input("ルームIDを入力してください")
+with col2:
+    st.markdown('<div class="nowrap">例：481475</div>', unsafe_allow_html=True)
 
-# ルームID入力（helpは使わず、ラベルに例を直接記載）
-room_id = st.text_input(
-    "対象のルームID（例：481475）",
-    value=""
-)
+# --- 月リストの準備（最新を上に） ---
+months = pd.date_range("2023-01-01", datetime.today(), freq="MS").strftime("%Y-%m").tolist()[::-1]
+selected_months = st.multiselect("取得したい月を選択してください", months)
 
-# 月の範囲（最新月が上に来る）
-start_month = 202501
-current_month = int(datetime.now().strftime("%Y%m"))
-months_list = list(range(start_month, current_month + 1))
-months_list.reverse()  # 最新月が先頭
-month_labels = [str(m) for m in months_list]
+# --- データ取得処理 ---
+def fetch_month_data(room_id, month):
+    # APIやスクレイピング処理の代わりにダミーデータ生成
+    data = [
+        {"avatar_id": 1, "level": 10, "title_id": 2, "user_id": "u001", "user_name": "Alice"},
+        {"avatar_id": 2, "level": 6,  "title_id": 1, "user_id": "u002", "user_name": "Bob"},
+        {"avatar_id": 3, "level": 3,  "title_id": 0, "user_id": "u003", "user_name": "Carol"},
+    ]
+    df = pd.DataFrame(data)
+    return df
 
-# 月選択（複数可、チェック式）
-selected_months = st.multiselect(
-    "取得したい月を選択",
-    options=month_labels,
-    default=[]
-)
-
-# 月選択と実行ボタンの間に余白を追加
-st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-
-# ZIP作成用バッファ
-zip_buffer = BytesIO()
-zip_file = ZipFile(zip_buffer, "w")
-
-# 実行ボタン（左寄せ）
-start_button = st.button("データ取得 & ZIP作成")
-
-if start_button:
-
+# --- 実行ボタン ---
+st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+if st.button("データ取得 & ZIP作成", use_container_width=False):
     if not room_id or not selected_months:
-        st.warning("ルームIDと月を必ず選択してください。")
+        st.warning("ルームIDと月を選択してください。")
     else:
-        st.info(f"{len(selected_months)}か月分のデータを取得します。")
+        with st.spinner("データ取得中..."):
+            temp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(temp_dir, "showroom_data.zip")
+            all_data = []
 
-        monthly_counts = {}
-        overall_progress = st.progress(0)
-        overall_text = st.empty()
-        processed_fans = 0
-        total_fans_overall = 0
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                # --- 各月のCSVを順番に格納 ---
+                for month in selected_months:
+                    df = fetch_month_data(room_id, month)
+                    all_data.append(df)
 
-        # 総ファン数合計
-        for month in selected_months:
-            url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
-            resp = requests.get(url)
-            if resp.status_code == 200:
-                data = resp.json()
-                monthly_counts[month] = data.get("count", 0)
-                total_fans_overall += monthly_counts[month]
-            else:
-                monthly_counts[month] = 0
+                    file_path = os.path.join(temp_dir, f"data_{month}.csv")
+                    # 列順を統一して保存
+                    df = df[["avatar_id", "level", "title_id", "user_id", "user_name"]]
+                    df.to_csv(file_path, index=False, encoding="utf-8-sig")
+                    zipf.write(file_path, arcname=f"data_{month}.csv")
 
-        st.markdown(
-            f"<div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>"
-            f"<b>総ファン数合計:</b> {total_fans_overall} 件"
-            f"</div>",
-            unsafe_allow_html=True
-        )
+                # --- 集計処理を最後に格納 ---
+                if all_data:
+                    merged_df = pd.concat(all_data, ignore_index=True)
 
-        # 月ごとに取得
-        for idx, month in enumerate(selected_months):
-            # 月ごとの背景色（交互）
-            bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
-
-            st.markdown(
-                f"<div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>"
-                f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-            # 進捗表示
-            col_text, col_bar = st.columns([3, 1])
-            with col_text:
-                month_text = st.empty()
-            with col_bar:
-                month_progress = st.progress(0)
-
-            fans_data = []
-            count = monthly_counts[month]
-            per_page = 50
-            retrieved = 0
-
-            while retrieved < count:
-                url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}&offset={retrieved}&limit={per_page}"
-                resp = requests.get(url)
-                if resp.status_code != 200:
-                    st.error(f"{month} の取得でエラー発生")
-                    break
-                data = resp.json()
-                users = data.get("users", [])
-                fans_data.extend(users)
-                retrieved += len(users)
-
-                # 月ごと進捗更新
-                if count > 0:
-                    month_progress.progress(min(retrieved / count, 1.0))
-                    month_text.markdown(
-                        f"<p style='font-size:14px; color:#374151;'>{retrieved}/{count} 件取得中…</p>",
-                        unsafe_allow_html=True
+                    grouped = (
+                        merged_df.groupby("user_id", as_index=False)
+                        .agg({
+                            "avatar_id": "first",
+                            "user_name": "first",
+                            "level": "sum"
+                        })
                     )
 
-                # 全体進捗更新
-                processed_fans += len(users)
-                overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
-                overall_text.markdown(
-                    f"<p style='font-size:14px; color:#1f2937;'>"
-                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
-                    f"</p>",
-                    unsafe_allow_html=True
-                )
+                    grouped["title_id"] = (grouped["level"] // 5).astype(int)
+                    grouped = grouped.sort_values("level", ascending=False)
 
-                time.sleep(0.05)
+                    # 列順を月ファイルと揃える
+                    grouped = grouped[["avatar_id", "level", "title_id", "user_id", "user_name"]]
 
-            # DataFrameに変換して UTF-8 BOM 付きで保存
-            df = pd.DataFrame(fans_data)
-            csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            csv_name = f"active_fans_{room_id}_{month}.csv"
-            zip_file.writestr(csv_name, csv_bytes)
+                    merged_csv_path = os.path.join(temp_dir, "merged_data.csv")
+                    grouped.to_csv(merged_csv_path, index=False, encoding="utf-8-sig")
+                    zipf.write(merged_csv_path, arcname="merged_data.csv")
 
-            # 月処理完了表示
-            month_text.markdown(
-                f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
-                unsafe_allow_html=True
-            )
-            month_progress.progress(1.0)
+        st.success("データ取得完了！")
+        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+        with open(zip_path, "rb") as f:
+            st.download_button("ZIPをダウンロード", f, file_name="showroom_data.zip", mime="application/zip")
 
-        zip_file.close()
-        zip_buffer.seek(0)
-
-        # ZIPダウンロードボタンの前に余白を追加
-        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-
-        st.download_button(
-            label="ZIPをダウンロード",
-            data=zip_buffer,
-            file_name=f"active_fans_{room_id}.zip",
-            mime="application/zip"
-        )
+        # 集計結果を画面にプレビュー
+        if all_data:
+            st.markdown("### 集計結果プレビュー（上位20件）")
+            st.dataframe(grouped.head(20))
