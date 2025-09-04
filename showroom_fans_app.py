@@ -41,9 +41,9 @@ selected_months = st.multiselect("取得したい月を選択", options=month_la
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
-# ZIPバッファ
-zip_buffer = BytesIO()
-zip_file = ZipFile(zip_buffer, "w")
+# ZIPバッファ（セッション状態で保持して画面が消えないように）
+if 'zip_buffer' not in st.session_state:
+    st.session_state.zip_buffer = None
 
 # 実行ボタン（左寄せ）
 start_button = st.button("データ取得 & ZIP作成")
@@ -72,6 +72,9 @@ if start_button:
 
         # 月ごとの取得
         all_fans_data = []  # マージ用
+        zip_buffer = BytesIO()
+        zip_file = ZipFile(zip_buffer, "w")
+
         for idx, month in enumerate(selected_months):
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
             st.markdown(
@@ -124,7 +127,6 @@ if start_button:
 
             # CSV作成（各月）
             df = pd.DataFrame(fans_data)
-            # 必須列順を維持
             df = df[['avatar_id','level','title_id','user_id','user_name']]
             csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             csv_name = f"active_fans_{room_id}_{month}.csv"
@@ -139,84 +141,41 @@ if start_button:
         # ---------- マージCSV作成 ----------
         if all_fans_data:
             st.markdown(
-                f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:10px;'>"
-                f"<h2 style='font-size:20px; color:#111827;'>マージファイル作成中…</h2>"
+                f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:4px;'>"
+                f"<h2 style='font-size:20px; color:#111827;'>マージファイル作成処理</h2>"
+                f"<p style='font-size:12px; color:#6b7280; margin-top:0;'>※退会ユーザーはマージデータには含まれません</p>"
                 f"</div>",
                 unsafe_allow_html=True
             )
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
-            # マージ集計（同じ avatar_id + user_id + user_name ごとに level 合算）
             merge_df = pd.DataFrame(all_fans_data)
             agg_df = merge_df.groupby(['avatar_id','user_id','user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
-            # 列順を各月CSVと同じに
             agg_df = agg_df[['avatar_id','level','title_id','user_id','user_name']]
-            # ソート
             agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # CSV書き込み
             merge_csv_bytes = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
+
             merge_progress.progress(1.0)
-            merge_text.markdown(f"<p style='font-size:14px; color:#10b981;'><b>マージCSV作成完了 ({len(agg_df)} 件)</b></p>", unsafe_allow_html=True)
-
-        zip_file.close()
-        zip_buffer.seek(0)
-
-        # ZIPダウンロード
-        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-        st.download_button(
-            label="ZIPをダウンロード",
-            data=zip_buffer,
-            file_name=f"active_fans_{room_id}.zip",
-            mime="application/zip"
-        )
-
-        # ---------- マージ集計表示（画面） ----------
-        if all_fans_data:
-            # 画面表示用集計
-            display_df = agg_df.copy()
-            display_df['順位'] = 0
-            last_level = None
-            rank = 0
-            for i, row in display_df.iterrows():
-                if row['level'] != last_level:
-                    rank = i + 1
-                    last_level = row['level']
-                display_df.at[i, '順位'] = rank
-            display_df = display_df[display_df['順位'] <= 100]
-
-            display_df = display_df[['順位','avatar_id','level','user_name']]
-            display_df.rename(columns={
-                'avatar_id': 'アバター',
-                'level': 'レベル合計値',
-                'user_name': 'ユーザー名'
-            }, inplace=True)
-
-            # 表示タイトル
-            st.markdown(
-                "<h3 style='text-align:center; color:#111827; margin-top:0; margin-bottom:4px; line-height:1.2; font-size:18px;'>"
-                "マージ集計（上位100位）</h3>",
+            merge_text.markdown(
+                f"<p style='font-size:14px; color:#10b981;'><b>マージCSV作成完了 ({len(agg_df)} 件)</b></p>",
                 unsafe_allow_html=True
             )
 
-            # HTML表作成
-            table_html = "<table style='width:100%; border-collapse:collapse;'>"
-            table_html += "<thead><tr style='background-color:#f3f4f6;'>"
-            for col in display_df.columns:
-                table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
-            table_html += "</tr></thead><tbody>"
-            for idx, row in display_df.iterrows():
-                table_html += "<tr>"
-                table_html += f"<td style='text-align:center;'>{row['順位']}</td>"
-                table_html += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='40'></td>"
-                table_html += f"<td style='text-align:center;'>{row['レベル合計値']}</td>"
-                table_html += f"<td style='text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
-                table_html += "</tr>"
-            table_html += "</tbody></table>"
+        zip_file.close()
+        zip_buffer.seek(0)
+        st.session_state.zip_buffer = zip_buffer  # セッションに保持
 
-            st.markdown(table_html, unsafe_allow_html=True)
-            st.markdown("<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
+# ZIPダウンロード（進捗情報を消さないように）
+if st.session_state.zip_buffer is not None:
+    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+    st.download_button(
+        label="ZIPをダウンロード",
+        data=st.session_state.zip_buffer,
+        file_name=f"active_fans_{room_id}.zip",
+        mime="application/zip"
+    )
