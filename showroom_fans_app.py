@@ -25,11 +25,10 @@ st.markdown(
 
 st.markdown("---")  # 区切り線
 
-# ルームID入力
+# ルームID入力（helpは使わず、ラベルに例を直接記載）
 room_id = st.text_input(
-    "対象のルームIDを入力してください",
-    value="",
-    help="例：481475"
+    "対象のルームID（例：481475）",
+    value=""
 )
 
 # 月の範囲（最新月が上に来る）
