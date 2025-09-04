@@ -36,7 +36,7 @@ months_list.reverse()
 month_labels = [str(m) for m in months_list]
 
 # 月選択
-selected_months = st.multiselect("取得したい月を選択", options=month_labels, default=[])
+selected_months = st.multiselect("取得したい月を選択（複数選択可）", options=month_labels, default=[])
 
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
