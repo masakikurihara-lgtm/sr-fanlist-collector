@@ -59,7 +59,7 @@ if start_button:
         processed_fans = 0
         total_fans_overall = 0
 
-        # 総ファン数
+        # 総ファン数（各月取得のためだけ）
         for month in selected_months:
             url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={month}"
             resp = requests.get(url)
@@ -69,13 +69,6 @@ if start_button:
                 total_fans_overall += monthly_counts[month]
             else:
                 monthly_counts[month] = 0
-
-        st.markdown(
-            f"<div style='background-color:#e5e7eb; padding:10px; border-radius:10px; text-align:center;'>"
-            f"<b>総ファン数合計:</b> {total_fans_overall} 件"
-            f"</div>",
-            unsafe_allow_html=True
-        )
 
         # 月ごとの取得
         all_fans_data = []  # マージ用
@@ -148,6 +141,7 @@ if start_button:
                 f"</div>",
                 unsafe_allow_html=True
             )
+
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
@@ -156,17 +150,13 @@ if start_button:
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
             agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
 
-            # 進捗表示だけループ
-            for i in range(len(agg_df)):
-                merge_progress.progress((i+1)/len(agg_df))
-                merge_text.markdown(
-                    f"<p style='font-size:14px; color:#374151;'>{i+1}/{len(agg_df)} 件マージ中…</p>",
-                    unsafe_allow_html=True
-                )
-                time.sleep(0.01)
+            # 進捗は簡易パーセント更新のみ
+            merge_text.markdown(f"<p style='font-size:14px; color:#374151;'>処理中…</p>", unsafe_allow_html=True)
+            merge_progress.progress(1.0)
 
-            # CSVは最後に一括書き込み（各月ファイルと同じレイアウト）
-            merge_csv_bytes = agg_df[['avatar_id','level','title_id','user_id','user_name']].to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            # CSV生成
+            merge_csv_bytes = agg_df[['avatar_id','level','title_id','user_id','user_name']].to_csv(
+                index=False, encoding="utf-8-sig").encode("utf-8-sig")
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
 
