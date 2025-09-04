@@ -32,7 +32,7 @@ room_id = st.text_input(
     help="例：481475"
 )
 
-# 月の範囲（最新月が上に来るようにソート）
+# 月の範囲（最新月が上に来る）
 start_month = 202501
 current_month = int(datetime.now().strftime("%Y%m"))
 months_list = list(range(start_month, current_month + 1))
@@ -50,10 +50,8 @@ selected_months = st.multiselect(
 zip_buffer = BytesIO()
 zip_file = ZipFile(zip_buffer, "w")
 
-# 実行ボタン（中央表示）
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    start_button = st.button("データ取得 & ZIP作成")
+# 実行ボタン（左寄せに修正）
+start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
 
@@ -87,10 +85,14 @@ if start_button:
         )
 
         # 月ごとに取得
-        for month in selected_months:
-            # サブタイトル（スマホでも見やすく）
+        for idx, month in enumerate(selected_months):
+            # 月ごとの背景色（交互）
+            bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
+
             st.markdown(
-                f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>",
+                f"<div style='background-color:{bg_color}; padding:15px; border-radius:10px; margin-bottom:10px;'>"
+                f"<h2 style='font-size:20px; color:#111827;'>{month} の処理</h2>"
+                f"</div>",
                 unsafe_allow_html=True
             )
 
