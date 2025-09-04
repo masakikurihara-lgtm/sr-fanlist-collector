@@ -197,10 +197,23 @@ if start_button:
                 'user_name': 'ユーザー名'
             }, inplace=True)
 
-            # スタイリッシュなHTMLテーブル表示（横スクロール対応）
+            # HTMLテーブル作成（列ごとの整列）
+            html_table = '<table style="border-collapse: collapse; width: 100%; font-size:14px;">'
+            # ヘッダー
+            html_table += '<tr style="background-color:#f3f4f6;">'
+            for col in display_df.columns:
+                align = 'center' if col != 'ユーザー名' else 'left'
+                html_table += f'<th style="border: 1px solid #ddd; padding: 8px; text-align:{align};">{col}</th>'
+            html_table += '</tr>'
+            # 行
+            for _, row in display_df.iterrows():
+                html_table += '<tr>'
+                for col in display_df.columns:
+                    align = 'center' if col != 'ユーザー名' else 'left'
+                    html_table += f'<td style="border: 1px solid #ddd; padding: 8px; text-align:{align};">{row[col]}</td>'
+                html_table += '</tr>'
+            html_table += '</table>'
+
             st.markdown("### 上位100位（マージ集計）")
-            st.markdown(
-                display_df.to_html(escape=False, index=False),
-                unsafe_allow_html=True
-            )
+            st.markdown(html_table, unsafe_allow_html=True)
             st.markdown("<p style='text-align:left; font-size:12px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
