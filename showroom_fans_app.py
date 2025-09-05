@@ -46,7 +46,7 @@ start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
     if not room_id or not selected_months:
-        st.warning("ルームIDと月を必ず選択してください。")
+        st.warning("ルームIDの入力と月の選択を必ず行ってください。")
     else:
         st.info(f"{len(selected_months)}か月分のデータを取得します。")
         monthly_counts = {}
@@ -182,7 +182,7 @@ if start_button:
                 key="zip_download"
             )
         else:
-            st.warning("取得できたデータがありませんでした。ZIPは生成されません。")
+            st.warning("該当データがありませんでした。")
 
         # ---------- マージ集計表示（画面） ----------
         if agg_df is not None and not agg_df.empty:
