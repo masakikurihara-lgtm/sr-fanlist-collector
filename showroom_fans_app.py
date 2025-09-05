@@ -41,17 +41,12 @@ selected_months = st.multiselect("取得したい月を選択（複数選択可�
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
-# ZIPバッファ
-zip_buffer = BytesIO()
-zip_file = ZipFile(zip_buffer, "w")
-
 # 実行ボタン（左寄せ）
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
-    # 入力チェック
     if not room_id or not selected_months:
-        st.error("ルームIDと月を必ず選択してください。")
+        st.warning("ルームIDと月を必ず選択してください。")
     else:
         st.info(f"{len(selected_months)}か月分のデータを取得します。")
         monthly_counts = {}
@@ -59,6 +54,10 @@ if start_button:
         overall_text = st.empty()
         processed_fans = 0
         total_fans_overall = 0
+
+        # ZIPバッファ
+        zip_buffer = BytesIO()
+        zip_file = ZipFile(zip_buffer, "w")
 
         # 総ファン数（マージ用）
         for month in selected_months:
@@ -90,12 +89,6 @@ if start_button:
 
             fans_data = []
             count = monthly_counts[month]
-
-            # データが0件なら警告を出してスキップ
-            if count == 0:
-                st.warning(f"{month} のデータはありません。")
-                continue
-
             per_page = 50
             retrieved = 0
 
@@ -119,13 +112,14 @@ if start_button:
                     )
 
                 processed_fans += len(users)
-                overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
-                overall_text.markdown(
-                    f"<p style='font-size:14px; color:#1f2937;'>"
-                    f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
-                    f"</p>",
-                    unsafe_allow_html=True
-                )
+                if total_fans_overall > 0:
+                    overall_progress.progress(min(processed_fans / total_fans_overall, 1.0))
+                    overall_text.markdown(
+                        f"<p style='font-size:14px; color:#1f2937;'>"
+                        f"全体進捗: {processed_fans}/{total_fans_overall} 件 ({processed_fans/total_fans_overall*100:.1f}%)"
+                        f"</p>",
+                        unsafe_allow_html=True
+                    )
 
                 time.sleep(0.05)
 
@@ -137,13 +131,14 @@ if start_button:
                 csv_name = f"active_fans_{room_id}_{month}.csv"
                 zip_file.writestr(csv_name, csv_bytes)
 
-                month_text.markdown(
-                    f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
-                    unsafe_allow_html=True
-                )
-                month_progress.progress(1.0)
+            month_text.markdown(
+                f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
+                unsafe_allow_html=True
+            )
+            month_progress.progress(1.0)
 
         # ---------- マージCSV作成（画面表示とCSV作成） ----------
+        agg_df = None
         if all_fans_data:
             st.markdown(
                 f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:10px;'>"
@@ -155,7 +150,7 @@ if start_button:
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
-            # マージ集計（同じ avatar_id + user_id + user_name ごとに level 合算）
+            # マージ集計
             merge_df = pd.DataFrame(all_fans_data)
             agg_df = merge_df.groupby(['avatar_id','user_id','user_name'], as_index=False)['level'].sum()
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
@@ -166,29 +161,31 @@ if start_button:
             merge_csv_bytes = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
+
             merge_progress.progress(1.0)
             merge_text.markdown(
                 f"<p style='font-size:14px; color:#10b981;'><b>マージCSV作成完了 ({len(agg_df)} 件)</b></p>",
                 unsafe_allow_html=True
             )
-        else:
-            st.warning("取得できたデータがありませんでした。")
 
         zip_file.close()
         zip_buffer.seek(0)
 
-        # ZIPダウンロード（画面表示維持）
-        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-        st.download_button(
-            label="ZIPをダウンロード",
-            data=zip_buffer,
-            file_name=f"active_fans_{room_id}.zip",
-            mime="application/zip",
-            key="zip_download"
-        )
+        # ZIPダウンロード（データがある場合のみ表示）
+        if all_fans_data:
+            st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+            st.download_button(
+                label="ZIPをダウンロード",
+                data=zip_buffer,
+                file_name=f"active_fans_{room_id}.zip",
+                mime="application/zip",
+                key="zip_download"
+            )
+        else:
+            st.warning("取得できたデータがありませんでした。ZIPは生成されません。")
 
         # ---------- マージ集計表示（画面） ----------
-        if all_fans_data:
+        if agg_df is not None and not agg_df.empty:
             display_df = agg_df.copy()
             display_df['順位'] = 0
             last_level = None
