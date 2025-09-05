@@ -49,8 +49,9 @@ zip_file = ZipFile(zip_buffer, "w")
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
+    # 入力チェック
     if not room_id or not selected_months:
-        st.warning("ルームIDと月を必ず選択してください。")
+        st.error("ルームIDと月を必ず選択してください。")
     else:
         st.info(f"{len(selected_months)}か月分のデータを取得します。")
         monthly_counts = {}
@@ -89,6 +90,12 @@ if start_button:
 
             fans_data = []
             count = monthly_counts[month]
+
+            # データが0件なら警告を出してスキップ
+            if count == 0:
+                st.warning(f"{month} のデータはありません。")
+                continue
+
             per_page = 50
             retrieved = 0
 
@@ -123,17 +130,18 @@ if start_button:
                 time.sleep(0.05)
 
             # CSV作成（各月）
-            df = pd.DataFrame(fans_data)
-            df = df[['avatar_id','level','title_id','user_id','user_name']]  # 列順維持
-            csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            csv_name = f"active_fans_{room_id}_{month}.csv"
-            zip_file.writestr(csv_name, csv_bytes)
+            if fans_data:
+                df = pd.DataFrame(fans_data)
+                df = df[['avatar_id','level','title_id','user_id','user_name']]  # 列順維持
+                csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+                csv_name = f"active_fans_{room_id}_{month}.csv"
+                zip_file.writestr(csv_name, csv_bytes)
 
-            month_text.markdown(
-                f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
-                unsafe_allow_html=True
-            )
-            month_progress.progress(1.0)
+                month_text.markdown(
+                    f"<p style='font-size:14px; color:#10b981;'><b>{month} の取得完了 ({len(fans_data)} 件)</b></p>",
+                    unsafe_allow_html=True
+                )
+                month_progress.progress(1.0)
 
         # ---------- マージCSV作成（画面表示とCSV作成） ----------
         if all_fans_data:
@@ -163,6 +171,8 @@ if start_button:
                 f"<p style='font-size:14px; color:#10b981;'><b>マージCSV作成完了 ({len(agg_df)} 件)</b></p>",
                 unsafe_allow_html=True
             )
+        else:
+            st.warning("取得できたデータがありませんでした。")
 
         zip_file.close()
         zip_buffer.seek(0)
