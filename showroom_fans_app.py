@@ -41,7 +41,7 @@ selected_months = st.multiselect("取得したい月を選択（複数選択可�
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
-# 実行ボタン
+# 実行ボタン（左寄せ）
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
@@ -72,6 +72,7 @@ if start_button:
 
         # 月ごとの取得
         all_fans_data = []  # マージ用
+        orig_order_counter = 0  # 取得順を付与
         for idx, month in enumerate(selected_months):
             bg_color = "#f9fafb" if idx % 2 == 0 else "#e0f2fe"
             st.markdown(
@@ -100,6 +101,10 @@ if start_button:
                     break
                 data = resp.json()
                 users = data.get("users", [])
+                # 取得順を付与
+                for u in users:
+                    u['orig_order'] = orig_order_counter
+                    orig_order_counter += 1
                 fans_data.extend(users)
                 all_fans_data.extend(users)
                 retrieved += len(users)
@@ -150,29 +155,23 @@ if start_button:
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
-            # マージ集計（user_idのみをキー、最後に処理した月の情報を保持）
+            # マージ集計（ユーザーIDのみをキー、最新月のアバター・ユーザーネームを使用）
             merge_df = pd.DataFrame(all_fans_data)
-
-            # level合算
-            agg_level = merge_df.groupby('user_id', as_index=False)['level'].sum()
-
-            # 最新情報（処理順最後）取得
-            latest_info = merge_df.drop_duplicates(subset='user_id', keep='last')[['user_id','avatar_id','user_name']]
-
-            # 合算結果に最新情報を結合
-            agg_df = agg_level.merge(latest_info, on='user_id', how='left')
-
-            # title_id 計算
+            # 最新月順（処理順の逆）で並び替え
+            merge_df = merge_df.iloc[::-1]
+            agg_df = merge_df.groupby('user_id', as_index=False).agg({
+                'level': 'sum',
+                'avatar_id': 'first',  # 逆順にしているので first が最新月の値
+                'user_name': 'first',
+                'orig_order': 'first'
+            })
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
-
-            # 列順を揃える
-            agg_df = agg_df[['avatar_id','level','title_id','user_id','user_name']]
-
-            # レベル降順＋ユーザーネーム昇順
-            agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
+            agg_df = agg_df[['avatar_id','level','title_id','user_id','user_name','orig_order']]
+            # ソート: レベル降順 + 取得順
+            agg_df = agg_df.sort_values(by=['level','orig_order'], ascending=[False, True]).reset_index(drop=True)
 
             # CSV書き込み
-            merge_csv_bytes = agg_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            merge_csv_bytes = agg_df.drop(columns='orig_order').to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             merge_csv_name = f"active_fans_{room_id}_merge.csv"
             zip_file.writestr(merge_csv_name, merge_csv_bytes)
 
