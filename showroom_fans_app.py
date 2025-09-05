@@ -148,7 +148,7 @@ if start_button:
             st.markdown(
                 f"<div style='background-color:#f3f4f6; padding:10px; border-radius:10px; margin-bottom:10px;'>"
                 f"<h2 style='font-size:20px; color:#111827;'>マージファイル作成処理</h2>"
-                f"<p style='font-size:12px; color:#6b7280; margin-top:0;'>※退会ユーザーはマージデータには含まれません</p>"
+                f"<p style='font-size:14px; color:#dc2626; font-weight:bold; background-color:#fef3c7; padding:4px; border-radius:4px; margin-top:0;'>※退会ユーザーはマージデータには含まれません</p>"
                 f"</div>",
                 unsafe_allow_html=True
             )
