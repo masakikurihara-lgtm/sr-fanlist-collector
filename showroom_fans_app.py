@@ -41,7 +41,7 @@ selected_months = st.multiselect("取得したい月を選択（複数選択可�
 # 月選択と実行ボタンの間に余白
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
-# 実行ボタン（左寄せ）
+# 実行ボタン
 start_button = st.button("データ取得 & ZIP作成")
 
 if start_button:
@@ -150,11 +150,25 @@ if start_button:
             merge_progress = st.progress(0)
             merge_text = st.empty()
 
-            # マージ集計
+            # マージ集計（user_idのみをキー、最後に処理した月の情報を保持）
             merge_df = pd.DataFrame(all_fans_data)
-            agg_df = merge_df.groupby(['avatar_id','user_id','user_name'], as_index=False)['level'].sum()
+
+            # level合算
+            agg_level = merge_df.groupby('user_id', as_index=False)['level'].sum()
+
+            # 最新情報（処理順最後）取得
+            latest_info = merge_df.drop_duplicates(subset='user_id', keep='last')[['user_id','avatar_id','user_name']]
+
+            # 合算結果に最新情報を結合
+            agg_df = agg_level.merge(latest_info, on='user_id', how='left')
+
+            # title_id 計算
             agg_df['title_id'] = (agg_df['level'] // 5).astype(int)
+
+            # 列順を揃える
             agg_df = agg_df[['avatar_id','level','title_id','user_id','user_name']]
+
+            # レベル降順＋ユーザーネーム昇順
             agg_df = agg_df.sort_values(by=['level','user_name'], ascending=[False, True]).reset_index(drop=True)
 
             # CSV書き込み
