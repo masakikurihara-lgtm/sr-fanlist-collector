@@ -6,6 +6,7 @@ from zipfile import ZipFile
 from datetime import datetime
 import time
 import logging
+import io
 
 # ページ設定
 st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
