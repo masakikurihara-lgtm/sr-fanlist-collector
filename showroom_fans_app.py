@@ -14,6 +14,9 @@ st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide"
 ROOM_LIST_URL = "https://mksoul-pro.com/showroom/file/room_list.csv"
 # ----- ▲ここまで追加▲ -----
 
+if "authenticated" not in st.session_state:  #認証用
+    st.session_state.authenticated = False  #認証用
+
 # タイトル
 st.markdown(
     "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンリスト取得ツール</h1>",
@@ -29,6 +32,43 @@ st.markdown(
 )
 
 st.markdown("---")
+
+
+# ▼▼ 認証ステップ ▼▼
+if not st.session_state.authenticated:
+    st.markdown("### 🔑 認証コードを入力してください")
+    input_room_id = st.text_input(
+        "認証コードを入力してください:",
+        placeholder="",
+        type="password",
+        key="room_id_input"
+    )
+
+    # 認証ボタン
+    if st.button("認証する"):
+        if input_room_id:  # 入力が空でない場合のみ
+            try:
+                response = requests.get(ROOM_LIST_URL, timeout=5)
+                response.raise_for_status()
+                room_df = pd.read_csv(io.StringIO(response.text), header=None)
+
+                valid_codes = set(str(x).strip() for x in room_df.iloc[:, 0].dropna())
+
+                if input_room_id.strip() in valid_codes:
+                    st.session_state.authenticated = True
+                    st.success("✅ 認証に成功しました。ツールを利用できます。")
+                    st.rerun()  # 認証成功後に再読み込み
+                else:
+                    st.error("❌ 認証コードが無効です。正しい認証コードを入力してください。")
+            except Exception as e:
+                st.error(f"認証リストを取得できませんでした: {e}")
+        else:
+            st.warning("認証コードを入力してください。")
+
+    # 認証が終わるまで他のUIを描画しない
+    st.stop()
+# ▲▲ 認証ステップここまで ▲▲
+
 
 # ルームID入力
 room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
