@@ -31,7 +31,7 @@ st.markdown(
 st.markdown("---")
 
 # ルームID入力
-room_id = st.text_input("対象のルームID（例：481475）:", placeholder="例: 154851", value="")
+room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
 
 # 月の範囲（最新月が上に来る）
 start_month = 202501
