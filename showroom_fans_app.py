@@ -145,9 +145,11 @@ if stats_button:
 
                     # --- テーブル表示（リッチなHTML形式） ---
                     st.markdown("#### 📋 統計データ一覧")
-                    df_display_stats = df_stats.sort_values("年月", ascending=False)
+                    # 表示順とCSV順を統一（年月、ファン名称、ファン数、ファンパワー）
+                    column_order = ["年月", "ファン名称", "ファン数", "ファンパワー"]
+                    df_display_stats = df_stats.sort_values("年月", ascending=False)[column_order]
                     
-                    # HTMLテーブルの構築（単位を削除し、文字列をクリーン化）
+                    # HTMLテーブルの構築
                     table_html = """
                     <table style='width:100%; border-collapse:collapse; font-size:14px;'>
                         <thead>
@@ -171,11 +173,10 @@ if stats_button:
                         """
                     table_html += "</tbody></table>"
                     
-                    # 重要：改行コードを削除してHTMLとして確実に認識させる
                     st.markdown(table_html.replace("\n", ""), unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
-                    # CSVダウンロード
+                    # CSVダウンロード（項目順を画面に合わせた df_display_stats を使用）
                     csv_stats = df_display_stats.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                     st.download_button(
                         label="統計CSVをダウンロード",
