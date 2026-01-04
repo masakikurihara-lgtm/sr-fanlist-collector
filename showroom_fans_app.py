@@ -7,6 +7,7 @@ from datetime import datetime
 import time
 import logging
 import io
+from dateutil.relativedelta import relativedelta
 
 # ページ設定
 st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
@@ -75,12 +76,15 @@ if not st.session_state.authenticated:
 # ルームID入力
 room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
 
-# 月の範囲（最新月が上に来る）
-start_month = 202501
-current_month = int(datetime.now().strftime("%Y%m"))
-months_list = list(range(start_month, current_month + 1))
-months_list.reverse()
-month_labels = [str(m) for m in months_list]
+# 月の範囲を作成（現在から2025年1月まで遡る）
+start_date = datetime(2025, 1, 1)
+current_date = datetime.now()
+
+month_labels = []
+tmp_date = current_date
+while tmp_date >= start_date:
+    month_labels.append(tmp_date.strftime("%Y%m"))
+    tmp_date -= relativedelta(months=1) # 1ヶ月ずつ遡る
 
 # 月選択
 selected_months = st.multiselect("取得したい月を選択（複数選択可）:", options=month_labels, default=[])
