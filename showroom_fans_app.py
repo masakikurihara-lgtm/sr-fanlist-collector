@@ -17,6 +17,9 @@ ROOM_LIST_URL = "https://mksoul-pro.com/showroom/file/room_list.csv"
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+# 特殊コード認証フラグの初期化
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
 
 # タイトル
 st.markdown(
@@ -46,14 +49,23 @@ if not st.session_state.authenticated:
 
     if st.button("認証する"):
         if input_room_id:
+            input_val = input_room_id.strip()
+            # 【追加】特殊コードの判定
+            if input_val == "mksp154851":
+                st.session_state.authenticated = True
+                st.session_state.is_admin = True
+                st.success("✅ 認証に成功しました。")
+                st.rerun()
+            
             try:
                 response = requests.get(ROOM_LIST_URL, timeout=5)
                 response.raise_for_status()
                 room_df = pd.read_csv(io.StringIO(response.text), header=None)
                 valid_codes = set(str(x).strip() for x in room_df.iloc[:, 0].dropna())
 
-                if input_room_id.strip() in valid_codes:
+                if input_val in valid_codes:
                     st.session_state.authenticated = True
+                    st.session_state.is_admin = False
                     st.success("✅ 認証に成功しました。ツールを利用できます。")
                     st.rerun()
                 else:
@@ -65,7 +77,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ルームID入力
-room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
+room_id = st.text_input("対象의 ルームID:", placeholder="例: 154851", value="")
 
 # 月の範囲を作成
 start_date = datetime(2025, 1, 1)
@@ -100,7 +112,8 @@ if stats_button:
         try:
             df_room_list = pd.read_csv(ROOM_LIST_URL, header=None)
             auth_ids = df_room_list.iloc[:, 0].astype(str).tolist()
-            if room_id in auth_ids:
+            # 【修正】管理者フラグがある場合はリストチェックをパス
+            if st.session_state.is_admin or (room_id in auth_ids):
                 st.markdown("### 📈 ファン数・ファンパワーの推移")
                 stats_list = []
                 
@@ -202,7 +215,8 @@ if start_button:
         try:
             df_room_list = pd.read_csv(ROOM_LIST_URL, header=None)
             auth_ids = df_room_list.iloc[:, 0].astype(str).tolist()
-            if room_id in auth_ids:
+            # 【修正】管理者フラグがある場合はリストチェックをパス
+            if st.session_state.is_admin or (room_id in auth_ids):
                 is_authenticated = True
             else:
                 st.error("指定されたルームIDは認証されていません。")
