@@ -147,7 +147,7 @@ if stats_button:
                     st.markdown("#### 📋 統計データ一覧")
                     df_display_stats = df_stats.sort_values("年月", ascending=False)
                     
-                    # HTMLテーブルの構築
+                    # HTMLテーブルの構築（単位を削除し、文字列をクリーン化）
                     table_html = """
                     <table style='width:100%; border-collapse:collapse; font-size:14px;'>
                         <thead>
@@ -165,13 +165,14 @@ if stats_button:
                             <tr style='border-bottom:1px solid #f0f0f0;'>
                                 <td style='padding:10px; text-align:center; font-weight:bold;'>{row['年月']}</td>
                                 <td style='padding:10px; text-align:center; color:#2563eb;'>{row['ファン名称']}</td>
-                                <td style='padding:10px; text-align:center;'>{row['ファン数']:,} 人</td>
-                                <td style='padding:10px; text-align:center;'>{row['ファンパワー']:,} Pt</td>
+                                <td style='padding:10px; text-align:center;'>{row['ファン数']:,}</td>
+                                <td style='padding:10px; text-align:center;'>{row['ファンパワー']:,}</td>
                             </tr>
                         """
                     table_html += "</tbody></table>"
                     
-                    st.markdown(table_html, unsafe_allow_html=True)
+                    # 重要：改行コードを削除してHTMLとして確実に認識させる
+                    st.markdown(table_html.replace("\n", ""), unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
                     # CSVダウンロード
