@@ -7,7 +7,7 @@ from datetime import datetime
 import time
 import io
 from dateutil.relativedelta import relativedelta
-import plotly.graph_objects as go  # グラフ一本化のため追加
+import plotly.graph_objects as go 
 
 # ページ設定
 st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
@@ -63,7 +63,6 @@ if not st.session_state.authenticated:
         else:
             st.warning("認証コードを入力してください。")
     st.stop()
-# ▲▲ 認証ステップここまで ▲▲
 
 # ルームID入力
 room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
@@ -86,11 +85,9 @@ st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 col_btn1, col_btn2 = st.columns([1, 1])
 
 with col_btn1:
-    # 既存機能のボタン
     start_button = st.button("データ取得 & ZIP作成")
 
 with col_btn2:
-    # 新規追加機能のボタン（統計用）
     stats_button = st.button("📊 ファン統計（推移）を表示")
 
 # ---------------------------------------------------------
@@ -107,8 +104,8 @@ if stats_button:
                 st.markdown("### 📈 ファン数・ファンパワーの推移")
                 stats_list = []
                 
-                # 月ごとにサマリーデータのみ取得（usersリストは取得しないため高速）
-                for m in sorted(selected_months):  # グラフ用に昇順で取得
+                # 月ごとにサマリーデータのみ取得
+                for m in sorted(selected_months): 
                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}"
                     resp = requests.get(url)
                     if resp.status_code == 200:
@@ -123,38 +120,59 @@ if stats_button:
                 if stats_list:
                     df_stats = pd.DataFrame(stats_list)
 
-                    # --- グラフ作成（Plotlyで一本化） ---
+                    # --- グラフ作成（Plotly 2軸） ---
                     fig = go.Figure()
-                    # ファン数（棒グラフ）
                     fig.add_trace(go.Bar(
                         x=df_stats["年月"], y=df_stats["ファン数"],
                         name="ファン数", marker_color='rgba(55, 128, 191, 0.7)',
                         yaxis="y1"
                     ))
-                    # ファンパワー（折れ線グラフ）
                     fig.add_trace(go.Scatter(
                         x=df_stats["年月"], y=df_stats["ファンパワー"],
                         name="ファンパワー", line=dict(color='firebrick', width=3),
                         yaxis="y2"
                     ))
-
                     fig.update_layout(
-                        title="ファン推移分析",
                         xaxis=dict(title="対象月"),
-                        yaxis=dict(title="ファン数", side="left"),
-                        yaxis2=dict(title="ファンパワー", side="right", overlaying="y", showgrid=False),
+                        yaxis=dict(title="ファン数（人）", side="left"),
+                        yaxis2=dict(title="ファンパワー（Pt）", side="right", overlaying="y", showgrid=False),
                         legend=dict(x=0.01, y=0.99),
                         template="plotly_white",
-                        margin=dict(l=20, r=20, t=50, b=20)
+                        height=450,
+                        margin=dict(l=20, r=20, t=20, b=20)
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # --- テーブル表示（最新月を上に） ---
+                    # --- テーブル表示（リッチなHTML形式） ---
                     st.markdown("#### 📋 統計データ一覧")
                     df_display_stats = df_stats.sort_values("年月", ascending=False)
                     
-                    # インデックス非表示で表示
-                    st.dataframe(df_display_stats, use_container_width=True, hide_index=True)
+                    # HTMLテーブルの構築
+                    table_html = """
+                    <table style='width:100%; border-collapse:collapse; font-size:14px;'>
+                        <thead>
+                            <tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'>
+                                <th style='padding:12px; text-align:center;'>年月</th>
+                                <th style='padding:12px; text-align:center;'>ファン名称</th>
+                                <th style='padding:12px; text-align:center;'>ファン数</th>
+                                <th style='padding:12px; text-align:center;'>ファンパワー</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+                    for idx, row in df_display_stats.iterrows():
+                        table_html += f"""
+                            <tr style='border-bottom:1px solid #f0f0f0;'>
+                                <td style='padding:10px; text-align:center; font-weight:bold;'>{row['年月']}</td>
+                                <td style='padding:10px; text-align:center; color:#2563eb;'>{row['ファン名称']}</td>
+                                <td style='padding:10px; text-align:center;'>{row['ファン数']:,} 人</td>
+                                <td style='padding:10px; text-align:center;'>{row['ファンパワー']:,} Pt</td>
+                            </tr>
+                        """
+                    table_html += "</tbody></table>"
+                    
+                    st.markdown(table_html, unsafe_allow_html=True)
+                    st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
                     # CSVダウンロード
                     csv_stats = df_display_stats.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
