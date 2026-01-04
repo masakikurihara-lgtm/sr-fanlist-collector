@@ -77,7 +77,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ルームID入力
-room_id = st.text_input("対象의 ルームID:", placeholder="例: 154851", value="")
+room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
 
 # 月の範囲を作成
 start_date = datetime(2025, 1, 1)
