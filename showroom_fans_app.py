@@ -20,14 +20,14 @@ if "authenticated" not in st.session_state:
 
 # タイトル
 st.markdown(
-    "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンリスト取得ツール</h1>",
+    "<h1 style='font-size:28px; text-align:center; color:#1f2937;'>SHOWROOM ファンデータ取得＆分析ツール</h1>",
     unsafe_allow_html=True
 )
 
 # 説明文
 st.markdown(
     "<p style='font-size:16px; text-align:center; color:#4b5563;'>"
-    "ルームIDを入力して、取得したい月を選択してください。取得後は ZIP でまとめてダウンロードできます。"
+    "ルームIDを入力して、取得・分析したい月を選択の上、各機能のボタンを押下してください。"
     "</p>",
     unsafe_allow_html=True
 )
