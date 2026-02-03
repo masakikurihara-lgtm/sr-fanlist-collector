@@ -230,46 +230,51 @@ if st.session_state.show_stats_view:
                             if 'ym' not in full_df.columns:
                                 st.error("エラー：データ内に年月情報が見つかりません。")
                             else:
-                                # 時系列比較のために古い順に並んだリストを使用
+                                # 比較のために年月を昇順（古い順）に並べる
                                 sorted_yms = sorted(list(full_df['ym'].unique()))
                                 if len(sorted_yms) < 2:
                                     st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
                                 else:
                                     alert_list = []
+                                    # user_idごとにグループ化して全期間をチェック
                                     for uid, group in full_df.groupby('user_id'):
                                         u_name = group['user_name'].iloc[-1]
+                                        # 当該ユーザーの年月ごとのレベルをマッピング
                                         lv_map = group.set_index('ym')['level'].to_dict()
-                                        u_rank = rank_map.get(uid, 999999)
+                                        u_rank = rank_map.get(uid, 999999) # 順位がない場合は末尾へ
                                         
-                                        # 【修正】比較は常に古い月(i)から新しい月(i+1)へ
+                                        # 【重要】すべての隣り合う月ペアをチェック
                                         for i in range(len(sorted_yms) - 1):
                                             prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
-                                            prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
                                             
-                                            # 両方の月にデータがある場合のみ比較（または0からの開始を許容するか）
+                                            # 両方の月にデータが存在する場合のみ比較
                                             if prev_m in lv_map and curr_m in lv_map:
+                                                prev_lv = lv_map[prev_m]
+                                                curr_lv = lv_map[curr_m]
                                                 diff = curr_lv - prev_lv
+                                                
                                                 if abs(diff) >= threshold:
                                                     kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
+                                                    # すべてのヒットをalert_listに追加（上書きしない）
                                                     alert_list.append({
                                                         "順位": u_rank if u_rank != 999999 else "-",
                                                         "ユーザー名": u_name,
                                                         "種別": kind_html,
-                                                        "対象期間": f"{prev_m} → {curr_m}", # 比較の向きを固定
-                                                        "当月Lv": curr_lv,
+                                                        "比較期間": f"{prev_m} → {curr_m}",
                                                         "前月Lv": prev_lv,
+                                                        "当月Lv": curr_lv,
                                                         "変動": f"{diff:+d}",
-                                                        "raw_rank": u_rank,
-                                                        "raw_month_val": int(curr_m.replace('/','')) # ソート用（新しい月が上）
+                                                        "raw_rank": u_rank, # 第1ソート用
+                                                        "raw_month_val": int(curr_m.replace('/','')) # 第2ソート用
                                                     })
                                     
                                     if alert_list:
-                                        # 【ソート】1.順位（昇順） 2.新しい方の月（降順）
+                                        # 【ソート実行】第1条件：順位（昇順）、第2条件：当月（降順：新しい月が上）
                                         alert_list.sort(key=lambda x: (x['raw_rank'], -x['raw_month_val']))
                                         
                                         alert_html = f"{table_style}<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>比較期間</th><th>前月Lv</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
                                         for a in alert_list:
-                                            alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['対象期間']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
+                                            alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['比較期間']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
                                         alert_html += "</tbody></table></div>"
                                         st.markdown(alert_html, unsafe_allow_html=True)
                                     else:
