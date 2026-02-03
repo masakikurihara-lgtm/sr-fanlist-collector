@@ -254,10 +254,10 @@ if st.session_state.show_stats_view:
                                                     "順位": u_rank if u_rank != 999999 else "-",
                                                     "ユーザー名": u_name,
                                                     "種別": kind_html,
-                                                    "当月": curr_m,
-                                                    "当月Lv": curr_lv,
                                                     "前月": prev_m,
                                                     "前月Lv": prev_lv,
+                                                    "当月": curr_m,
+                                                    "当月Lv": curr_lv,
                                                     "変動": f"{diff:+d}",
                                                     "raw_rank": u_rank,
                                                     "raw_month": curr_m
