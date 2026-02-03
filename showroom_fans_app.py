@@ -102,22 +102,36 @@ with col_btn1:
 with col_btn2:
     stats_button = st.button("📊 ファン統計（推移）を表示")
 
+
 # ---------------------------------------------------------
 # 新機能：ファン統計（推移）処理セクション
 # ---------------------------------------------------------
+# 表示状態を維持するためのフラグ初期化（既存機能には影響しません）
+if "show_stats_view" not in st.session_state:
+    st.session_state.show_stats_view = False
+if "show_detail_analysis" not in st.session_state:
+    st.session_state.show_detail_analysis = False
+
+# ボタンが押されたらフラグをオンにする
 if stats_button:
+    st.session_state.show_stats_view = True
+
+# 「統計を表示」フラグがオンの間は、ずっと表示され続ける
+if st.session_state.show_stats_view:
     if not room_id or not selected_months:
         st.warning("ルームIDの入力と月の選択を必ず行ってください。")
     else:
         try:
             df_room_list = pd.read_csv(ROOM_LIST_URL, header=None)
             auth_ids = df_room_list.iloc[:, 0].astype(str).tolist()
-            # 【修正】管理者フラグがある場合はリストチェックをパス
+            
             if st.session_state.is_admin or (room_id in auth_ids):
                 st.markdown("### 📈 ファン数・ファンパワーの推移")
                 stats_list = []
                 
-                # 月ごとにサマリーデータのみ取得
+                # --- 詳細分析でも使うためのデータ保持用リスト ---
+                all_fans_data_for_analysis = [] 
+                
                 for m in sorted(selected_months): 
                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}"
                     resp = requests.get(url)
@@ -129,6 +143,9 @@ if stats_button:
                             "ファンパワー": data.get("fan_power", 0),
                             "ファン名称": data.get("fan_name", "-")
                         })
+                        # 詳細分析用に個別ユーザーデータも溜める
+                        users = data.get("users", [])
+                        all_fans_data_for_analysis.extend(users)
                 
                 if stats_list:
                     df_stats = pd.DataFrame(stats_list)
@@ -150,126 +167,54 @@ if stats_button:
                         yaxis=dict(title="ファン数（人）", side="left"),
                         yaxis2=dict(title="ファンパワー（Pt）", side="right", overlaying="y", showgrid=False),
                         legend=dict(x=0.01, y=0.99),
-                        template="plotly_white",
-                        height=450,
-                        margin=dict(l=20, r=20, t=20, b=20)
+                        template="plotly_white", height=450, margin=dict(l=20, r=20, t=20, b=20)
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # --- テーブル表示（リッチなHTML形式） ---
+                    # --- テーブル表示 ---
                     st.markdown("#### 📋 統計データ一覧")
-                    # 表示順とCSV順を統一（年月、ファン名称、ファン数、ファンパワー）
                     column_order = ["年月", "ファン名称", "ファン数", "ファンパワー"]
                     df_display_stats = df_stats.sort_values("年月", ascending=False)[column_order]
                     
-                    # HTMLテーブルの構築
-                    table_html = """
-                    <table style='width:100%; border-collapse:collapse; font-size:14px;'>
-                        <thead>
-                            <tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'>
-                                <th style='padding:12px; text-align:center;'>年月</th>
-                                <th style='padding:12px; text-align:center;'>ファン名称</th>
-                                <th style='padding:12px; text-align:center;'>ファン数</th>
-                                <th style='padding:12px; text-align:center;'>ファンパワー</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                    """
+                    table_html = "<table style='width:100%; border-collapse:collapse; font-size:14px;'><thead><tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'><th style='padding:12px; text-align:center;'>年月</th><th style='padding:12px; text-align:center;'>ファン名称</th><th style='padding:12px; text-align:center;'>ファン数</th><th style='padding:12px; text-align:center;'>ファンパワー</th></tr></thead><tbody>"
                     for idx, row in df_display_stats.iterrows():
-                        table_html += f"""
-                            <tr style='border-bottom:1px solid #f0f0f0;'>
-                                <td style='padding:10px; text-align:center; font-weight:bold;'>{row['年月']}</td>
-                                <td style='padding:10px; text-align:center; color:#2563eb;'>{row['ファン名称']}</td>
-                                <td style='padding:10px; text-align:center;'>{row['ファン数']:,}</td>
-                                <td style='padding:10px; text-align:center;'>{row['ファンパワー']:,}</td>
-                            </tr>
-                        """
+                        table_html += f"<tr style='border-bottom:1px solid #f0f0f0;'><td style='padding:10px; text-align:center; font-weight:bold;'>{row['年月']}</td><td style='padding:10px; text-align:center; color:#2563eb;'>{row['ファン名称']}</td><td style='padding:10px; text-align:center;'>{row['ファン数']:,}</td><td style='padding:10px; text-align:center;'>{row['ファンパワー']:,}</td></tr>"
                     table_html += "</tbody></table>"
-                    
-                    st.markdown(table_html.replace("\n", ""), unsafe_allow_html=True)
-                    st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+                    st.markdown(table_html, unsafe_allow_html=True)
 
-                    # CSVダウンロード（項目順を画面に合わせた df_display_stats を使用）
                     csv_stats = df_display_stats.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-                    st.download_button(
-                        label="統計CSVをダウンロード",
-                        data=csv_stats,
-                        file_name=f"fan_stats_{room_id}.csv",
-                        mime="text/csv"
-                    )
+                    st.download_button(label="統計CSVをダウンロード", data=csv_stats, file_name=f"fan_stats_{room_id}.csv", mime="text/csv")
 
-
-                    # --- 統計データ一覧の表示（既存）の直後に追加 ---
+                    # --- 追加分析セクション ---
                     st.markdown("---")
-                    if "show_detail_analysis" not in st.session_state:
-                        st.session_state.show_detail_analysis = False
-
                     if st.button("🔍 さらに詳細分析する"):
                         st.session_state.show_detail_analysis = True
 
                     if st.session_state.show_detail_analysis:
                         st.markdown("### 🧬 ファンデータ詳細分析")
                         
-                        # 1. データの準備（全選択月の詳細データを結合）
-                        # ※start_button押下時に取得した all_fans_data を活用
-                        if 'all_fans_data' in locals() and all_fans_data:
-                            full_df = pd.DataFrame(all_fans_data)
+                        if all_fans_data_for_analysis:
+                            full_df = pd.DataFrame(all_fans_data_for_analysis)
                             
-                            # 月ごとのカウント用
-                            # ym（年月）はAPIから取得時に付与、またはループ内で管理している変数を利用
-                            # ここでは agg_df を拡張する形で合算ランキングを作成
-                            
-                            # --- 合算ランキング作成ロジック ---
-                            # ユーザーIDごとに集計
+                            # 合算ランキング作成
                             analysis_df = full_df.groupby('user_id').agg({
                                 'level': ['sum', 'mean', lambda x: (x >= 10).sum()],
                                 'user_name': 'first',
                                 'avatar_id': 'first'
                             }).reset_index()
-                            
                             analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
-                            
-                            # フィルタリング（レベル5以上を対象とする場合）
                             analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
-                            
-                            # 順位付け
                             analysis_df = analysis_df.sort_values('レベル合計値', ascending=False).reset_index(drop=True)
                             analysis_df.insert(0, '順位', analysis_df.index + 1)
 
-                            # --- ① 合算ランキング（HTMLテーブル） ---
                             st.markdown("#### 🏆 合算ランキング（期間累計）")
-                            
-                            table_html = """
-                            <table style='width:100%; border-collapse:collapse; font-size:14px;'>
-                                <thead>
-                                    <tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'>
-                                        <th style='padding:10px; text-align:center;'>順位</th>
-                                        <th style='padding:10px; text-align:center;'>アバター</th>
-                                        <th style='padding:10px; text-align:center;'>ユーザー名</th>
-                                        <th style='padding:10px; text-align:center;'>レベル合計</th>
-                                        <th style='padding:10px; text-align:center;'>平均レベル</th>
-                                        <th style='padding:10px; text-align:center;'>ファン回数</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                            """
-                            for _, row in analysis_df.head(100).iterrows(): # 上位100名
-                                table_html += f"""
-                                    <tr style='border-bottom:1px solid #f0f0f0;'>
-                                        <td style='padding:8px; text-align:center; font-weight:bold;'>{row['順位']}</td>
-                                        <td style='padding:8px; text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='35'></td>
-                                        <td style='padding:8px; text-align:left;'>{row['ユーザー名']}</td>
-                                        <td style='padding:8px; text-align:center;'>{row['レベル合計値']:,}</td>
-                                        <td style='padding:8px; text-align:center;'>{row['平均レベル']:.1f}</td>
-                                        <td style='padding:8px; text-align:center;'>{int(row['ファン回数'])}回</td>
-                                    </tr>
-                                """
-                            table_html += "</tbody></table>"
-                            st.markdown(table_html, unsafe_allow_html=True)
-
-                            # --- ② 順位変動アラート & ③ 特定ユーザー分析 ---
-                            # ここに変動ロジックとユーザー選択セレクトボックスを追加していきます
-
+                            table_html_detail = "<table style='width:100%; border-collapse:collapse; font-size:14px;'><thead><tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'><th style='padding:10px; text-align:center;'>順位</th><th style='padding:10px; text-align:center;'>アバター</th><th style='padding:10px; text-align:center;'>ユーザー名</th><th style='padding:10px; text-align:center;'>レベル合計</th><th style='padding:10px; text-align:center;'>平均レベル</th><th style='padding:10px; text-align:center;'>ファン回数</th></tr></thead><tbody>"
+                            for _, row in analysis_df.head(100).iterrows():
+                                table_html_detail += f"<tr style='border-bottom:1px solid #f0f0f0;'><td style='padding:8px; text-align:center; font-weight:bold;'>{row['順位']}</td><td style='padding:8px; text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='35'></td><td style='padding:8px; text-align:left;'>{row['ユーザー名']}</td><td style='padding:8px; text-align:center;'>{row['レベル合計値']:,}</td><td style='padding:8px; text-align:center;'>{row['平均レベル']:.1f}</td><td style='padding:8px; text-align:center;'>{int(row['ファン回数'])}回</td></tr>"
+                            table_html_detail += "</tbody></table>"
+                            st.markdown(table_html_detail, unsafe_allow_html=True)
+                        else:
+                            st.warning("詳細分析用のデータが取得できていません。")
 
                 else:
                     st.error("データの取得に失敗しました。")
