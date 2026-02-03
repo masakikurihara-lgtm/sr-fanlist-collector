@@ -383,10 +383,13 @@ if start_button:
                     unsafe_allow_html=True
                 )
 
-                table_html = "<table style='width:100%; border-collapse:collapse;'>"
+                # 外側に70vhのスクロール用divを追加し、thにsticky（見出し固定）を適用
+                table_html = "<div style='max-height: 70vh; overflow-y: auto; border-bottom: 1px solid #ccc;'>"
+                table_html += "<table style='width:100%; border-collapse:collapse;'>"
                 table_html += "<thead><tr style='background-color:#f3f4f6;'>"
                 for col in display_df.columns:
-                    table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center;'>{col}</th>"
+                    # 見出しを固定するためのスタイル（position: sticky）を追加
+                    table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center; position: sticky; top: 0; background-color: #f3f4f6; z-index: 1;'>{col}</th>"
                 table_html += "</tr></thead><tbody>"
                 for idx, row in display_df.iterrows():
                     table_html += "<tr>"
@@ -395,7 +398,7 @@ if start_button:
                     table_html += f"<td style='text-align:center;'>{row['レベル合計値']}</td>"
                     table_html += f"<td style='text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
                     table_html += "</tr>"
-                table_html += "</tbody></table>"
+                table_html += "</tbody></table></div>"
 
                 st.markdown(table_html, unsafe_allow_html=True)
                 st.markdown("<p style='font-size:12px; text-align:left; margin-top:4px;'>※100位まで表示しています</p>", unsafe_allow_html=True)
