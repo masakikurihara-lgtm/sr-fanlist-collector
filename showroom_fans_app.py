@@ -233,18 +233,25 @@ if st.session_state.show_stats_view:
                         # セッション内の全量データ(full_fans_data)を使用して分析
                         if "full_fans_data" in st.session_state and st.session_state.full_fans_data:
                             full_df = pd.DataFrame(st.session_state.full_fans_data)
-                            
-                            # --- 🏆 合算ランキング表示 ---
-                            # 以降、提示いただいた analysis_df の集計ロジックをそのまま使用
 
                             # --- 🏆 合算ランキング表示 ---
                             st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
+
+                            # 修正：aggの中でlambdaを使用して「レベル10以上の月数」をカウントする
                             analysis_df = full_df.groupby('user_id').agg({
-                                'level': ['sum', 'mean', 'count'],
+                                'level': [
+                                    ('レベル合計値', 'sum'),
+                                    ('平均レベル', 'mean'),
+                                    ('ファン回数', lambda x: (x >= 10).sum()) # レベル10以上のレコード数のみカウント
+                                ],
                                 'user_name': 'first',
                                 'avatar_id': 'first'
                             }).reset_index()
+
+                            # マルチカラムをフラット化
                             analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
+
+                            # 以降の処理（フィルタ・順位付け）
                             analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
                             analysis_df['順位'] = analysis_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
                             analysis_df = analysis_df.sort_values('順位', ascending=True).reset_index(drop=True)
