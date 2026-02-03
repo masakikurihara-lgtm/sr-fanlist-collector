@@ -236,22 +236,31 @@ if st.session_state.show_stats_view:
                                 if len(sorted_yms) < 2:
                                     st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
                                 else:
-                                    # 表示用の全データを格納するリスト
                                     alert_list = []
                                     
-                                    # 1. ユーザーIDごとにグループ化して処理することで、データが散らばるのを防ぐ
+                                    # 全ユーザーIDを網羅
                                     for uid, group in full_df.groupby('user_id'):
                                         u_name = group['user_name'].iloc[-1]
                                         lv_map = group.set_index('ym')['level'].to_dict()
                                         u_rank = rank_map.get(uid, 999999) 
                                         
-                                        # このユーザー内で条件に合う変動をすべて抽出
                                         user_temp_alerts = []
+                                        
+                                        # 【修正の肝】レコードの有無に関わらず、選択期間の「全月」を走査
                                         for i in range(len(sorted_yms) - 1):
                                             prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
-                                            prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
+                                            
+                                            # レコードがない月は 0 として取得
+                                            prev_lv = lv_map.get(prev_m, 0)
+                                            curr_lv = lv_map.get(curr_m, 0)
+                                            
+                                            # 両方0（ずっと活動なし）なら無視
+                                            if prev_lv == 0 and curr_lv == 0:
+                                                continue
+                                                
                                             diff = curr_lv - prev_lv
                                             
+                                            # 絶対値でしきい値を判定（これで 5→8 の +3 も拾えるようになる）
                                             if abs(diff) >= threshold:
                                                 kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
                                                 user_temp_alerts.append({
@@ -267,9 +276,8 @@ if st.session_state.show_stats_view:
                                                     "raw_month": curr_m
                                                 })
                                         
-                                        # このユーザーに該当があれば、全体リストに追加
                                         if user_temp_alerts:
-                                            # 同一ユーザー内では「新しい月」を上にする
+                                            # 月が新しい順に並べ替え
                                             user_temp_alerts.sort(key=lambda x: -int(str(x['raw_month']).replace('/','')))
                                             alert_list.append({
                                                 "rank": u_rank,
@@ -277,16 +285,11 @@ if st.session_state.show_stats_view:
                                             })
                                     
                                     if alert_list:
-                                        # 2. 全体を「順位」でソート
                                         alert_list.sort(key=lambda x: x['rank'])
-                                        
                                         alert_html = f"{table_style}<div class='scroll-table' style='max-height:50vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
-                                        
-                                        # 3. ユーザー単位で塊にしてテーブル行を生成
                                         for user_block in alert_list:
                                             for a in user_block['alerts']:
                                                 alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
-                                        
                                         alert_html += "</tbody></table></div>"
                                         st.markdown(alert_html, unsafe_allow_html=True)
                                     else:
