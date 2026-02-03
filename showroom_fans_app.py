@@ -197,85 +197,86 @@ if stats_button:
                         file_name=f"fan_stats_{room_id}.csv",
                         mime="text/csv"
                     )
+
+
+                    # --- 統計データ一覧の表示（既存）の直後に追加 ---
+                    st.markdown("---")
+                    if "show_detail_analysis" not in st.session_state:
+                        st.session_state.show_detail_analysis = False
+
+                    if st.button("🔍 さらに詳細分析する"):
+                        st.session_state.show_detail_analysis = True
+
+                    if st.session_state.show_detail_analysis:
+                        st.markdown("### 🧬 ファンデータ詳細分析")
+                        
+                        # 1. データの準備（全選択月の詳細データを結合）
+                        # ※start_button押下時に取得した all_fans_data を活用
+                        if 'all_fans_data' in locals() and all_fans_data:
+                            full_df = pd.DataFrame(all_fans_data)
+                            
+                            # 月ごとのカウント用
+                            # ym（年月）はAPIから取得時に付与、またはループ内で管理している変数を利用
+                            # ここでは agg_df を拡張する形で合算ランキングを作成
+                            
+                            # --- 合算ランキング作成ロジック ---
+                            # ユーザーIDごとに集計
+                            analysis_df = full_df.groupby('user_id').agg({
+                                'level': ['sum', 'mean', lambda x: (x >= 10).sum()],
+                                'user_name': 'first',
+                                'avatar_id': 'first'
+                            }).reset_index()
+                            
+                            analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
+                            
+                            # フィルタリング（レベル5以上を対象とする場合）
+                            analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
+                            
+                            # 順位付け
+                            analysis_df = analysis_df.sort_values('レベル合計値', ascending=False).reset_index(drop=True)
+                            analysis_df.insert(0, '順位', analysis_df.index + 1)
+
+                            # --- ① 合算ランキング（HTMLテーブル） ---
+                            st.markdown("#### 🏆 合算ランキング（期間累計）")
+                            
+                            table_html = """
+                            <table style='width:100%; border-collapse:collapse; font-size:14px;'>
+                                <thead>
+                                    <tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'>
+                                        <th style='padding:10px; text-align:center;'>順位</th>
+                                        <th style='padding:10px; text-align:center;'>アバター</th>
+                                        <th style='padding:10px; text-align:center;'>ユーザー名</th>
+                                        <th style='padding:10px; text-align:center;'>レベル合計</th>
+                                        <th style='padding:10px; text-align:center;'>平均レベル</th>
+                                        <th style='padding:10px; text-align:center;'>ファン回数</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                            """
+                            for _, row in analysis_df.head(100).iterrows(): # 上位100名
+                                table_html += f"""
+                                    <tr style='border-bottom:1px solid #f0f0f0;'>
+                                        <td style='padding:8px; text-align:center; font-weight:bold;'>{row['順位']}</td>
+                                        <td style='padding:8px; text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='35'></td>
+                                        <td style='padding:8px; text-align:left;'>{row['ユーザー名']}</td>
+                                        <td style='padding:8px; text-align:center;'>{row['レベル合計値']:,}</td>
+                                        <td style='padding:8px; text-align:center;'>{row['平均レベル']:.1f}</td>
+                                        <td style='padding:8px; text-align:center;'>{int(row['ファン回数'])}回</td>
+                                    </tr>
+                                """
+                            table_html += "</tbody></table>"
+                            st.markdown(table_html, unsafe_allow_html=True)
+
+                            # --- ② 順位変動アラート & ③ 特定ユーザー分析 ---
+                            # ここに変動ロジックとユーザー選択セレクトボックスを追加していきます
+
+
                 else:
                     st.error("データの取得に失敗しました。")
             else:
                 st.error("指定されたルームIDは認証されていません。")
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
-
-
-
-# --- 統計データ一覧の表示（既存）の直後に追加 ---
-st.markdown("---")
-if "show_detail_analysis" not in st.session_state:
-    st.session_state.show_detail_analysis = False
-
-if st.button("🔍 さらに詳細分析する"):
-    st.session_state.show_detail_analysis = True
-
-if st.session_state.show_detail_analysis:
-    st.markdown("### 🧬 ファンデータ詳細分析")
-    
-    # 1. データの準備（全選択月の詳細データを結合）
-    # ※start_button押下時に取得した all_fans_data を活用
-    if 'all_fans_data' in locals() and all_fans_data:
-        full_df = pd.DataFrame(all_fans_data)
-        
-        # 月ごとのカウント用
-        # ym（年月）はAPIから取得時に付与、またはループ内で管理している変数を利用
-        # ここでは agg_df を拡張する形で合算ランキングを作成
-        
-        # --- 合算ランキング作成ロジック ---
-        # ユーザーIDごとに集計
-        analysis_df = full_df.groupby('user_id').agg({
-            'level': ['sum', 'mean', lambda x: (x >= 10).sum()],
-            'user_name': 'first',
-            'avatar_id': 'first'
-        }).reset_index()
-        
-        analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
-        
-        # フィルタリング（レベル5以上を対象とする場合）
-        analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
-        
-        # 順位付け
-        analysis_df = analysis_df.sort_values('レベル合計値', ascending=False).reset_index(drop=True)
-        analysis_df.insert(0, '順位', analysis_df.index + 1)
-
-        # --- ① 合算ランキング（HTMLテーブル） ---
-        st.markdown("#### 🏆 合算ランキング（期間累計）")
-        
-        table_html = """
-        <table style='width:100%; border-collapse:collapse; font-size:14px;'>
-            <thead>
-                <tr style='background-color:#f3f4f6; border-bottom:2px solid #e5e7eb;'>
-                    <th style='padding:10px; text-align:center;'>順位</th>
-                    <th style='padding:10px; text-align:center;'>アバター</th>
-                    <th style='padding:10px; text-align:center;'>ユーザー名</th>
-                    <th style='padding:10px; text-align:center;'>レベル合計</th>
-                    <th style='padding:10px; text-align:center;'>平均レベル</th>
-                    <th style='padding:10px; text-align:center;'>ファン回数</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        for _, row in analysis_df.head(100).iterrows(): # 上位100名
-            table_html += f"""
-                <tr style='border-bottom:1px solid #f0f0f0;'>
-                    <td style='padding:8px; text-align:center; font-weight:bold;'>{row['順位']}</td>
-                    <td style='padding:8px; text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='35'></td>
-                    <td style='padding:8px; text-align:left;'>{row['ユーザー名']}</td>
-                    <td style='padding:8px; text-align:center;'>{row['レベル合計値']:,}</td>
-                    <td style='padding:8px; text-align:center;'>{row['平均レベル']:.1f}</td>
-                    <td style='padding:8px; text-align:center;'>{int(row['ファン回数'])}回</td>
-                </tr>
-            """
-        table_html += "</tbody></table>"
-        st.markdown(table_html, unsafe_allow_html=True)
-
-        # --- ② 順位変動アラート & ③ 特定ユーザー分析 ---
-        # ここに変動ロジックとユーザー選択セレクトボックスを追加していきます
 
 
 
