@@ -186,31 +186,22 @@ if st.session_state.show_stats_view:
                     csv_stats = df_display_stats.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                     st.download_button(label="統計CSVをダウンロード", data=csv_stats, file_name=f"fan_stats_{room_id}.csv", mime="text/csv")
 
-                    # --- 追加分析セクション ---
-                    st.markdown("---")
-                    if st.button("🔍 さらに詳細分析する"):
-                        st.session_state.show_detail_analysis = True
 
-                    if st.session_state.show_detail_analysis:
-                        st.markdown("### 🧬 ファンデータ詳細分析")
-                        
-                        if all_fans_data_for_analysis:
-                            # 1. 基礎データフレーム作成
-                            full_df = pd.DataFrame(all_fans_data_for_analysis)
 
                     # --- 追加分析セクション ---
                     st.markdown("---")
-                    if st.button("🔍 さらに詳細分析する"):
-                        # 既存の処理は一切いじらず、ここで「詳細分析専用」にデータを全量化する
+
+                    # ボタンに一意の key="detail_analysis_btn" を追加
+                    if st.button("🔍 さらに詳細分析する", key="detail_analysis_btn"):
+                        # ボタンが押されたときだけ全量取得を実行
                         with st.spinner("詳細分析のため、全ファンデータを取得中..."):
                             full_analysis_data = []
-                            # 前段で選択されている room_id や selected_months をそのまま利用
+                            # 前段で選択済みの room_id, selected_months を流用
                             for m in sorted(selected_months):
                                 retrieved = 0
-                                per_page = 100 # 効率のため最大値で取得
+                                per_page = 100 
                                 
                                 while True:
-                                    # APIのoffsetを回して全件取得
                                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
                                     try:
                                         resp = requests.get(url)
@@ -228,22 +219,23 @@ if st.session_state.show_stats_view:
                                         retrieved += len(users)
                                         if retrieved >= total:
                                             break
-                                    except:
+                                    except Exception:
                                         break
                             
-                            # 取得した全量データを詳細分析用の変数に格納
+                            # 取得した全量データをセッションに保存
                             st.session_state.full_fans_data = full_analysis_data
                             st.session_state.show_detail_analysis = True
 
-                    if st.session_state.show_detail_analysis:
+                    # 分析表示セクション
+                    if st.session_state.get('show_detail_analysis', False):
                         st.markdown("### 🧬 ファンデータ詳細分析")
                         
-                        # 前段の不完全なデータではなく、今取得した全量データ(full_fans_data)を使用
+                        # セッション内の全量データ(full_fans_data)を使用して分析
                         if "full_fans_data" in st.session_state and st.session_state.full_fans_data:
                             full_df = pd.DataFrame(st.session_state.full_fans_data)
                             
                             # --- 🏆 合算ランキング表示 ---
-                            # (ここから下の分析ロジックは提示いただいたものと同じでOK。母数が全量になります)
+                            # 以降、提示いただいた analysis_df の集計ロジックをそのまま使用
 
                             # --- 🏆 合算ランキング表示 ---
                             st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
