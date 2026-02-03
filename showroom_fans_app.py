@@ -210,13 +210,15 @@ if st.session_state.show_stats_view:
                             analysis_df['順位'] = analysis_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
                             analysis_df = analysis_df.sort_values('順位', ascending=True).reset_index(drop=True)
 
-                            # 順位引き出し用の辞書
+                            # 順位引き出し用の辞書作成
                             rank_map = analysis_df.set_index('user_id')['順位'].to_dict()
 
+                            # CSS定義（高さ70vhを維持）
                             table_style = "<style>.scroll-table { max-height: 70vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
+                            
                             table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
                             for _, row in analysis_df.iterrows():
-                                table_html_detail += f"<tr><td style='text-align:center; font-weight:bold;'>{row['順位']}</td><td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td><td>{row['ユーザー名']}</td><td style='text-align:center;'>{row['レベル合計値']:,}</td><td style='text-align:center;'>{row['平均レベル']:.1f}</td><td style='text-align:center;'>{int(row['ファン回_count'] if 'ファン回数' in row else row['ファン回数'])}回</td></tr>"
+                                table_html_detail += f"<tr><td style='text-align:center; font-weight:bold;'>{row['順位']}</td><td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td><td>{row['ユーザー名']}</td><td style='text-align:center;'>{row['レベル合計値']:,}</td><td style='text-align:center;'>{row['平均レベル']:.1f}</td><td style='text-align:center;'>{int(row['ファン回数'])}回</td></tr>"
                             table_html_detail += "</tbody></table></div>"
                             st.markdown(table_html_detail, unsafe_allow_html=True)
 
@@ -226,44 +228,49 @@ if st.session_state.show_stats_view:
                             with col_head1:
                                 st.markdown("#### 📈 レベル急変動アラート")
                             with col_head2:
+                                # 手動でしきい値を設定（デフォルト10）
                                 threshold = st.number_input("検知しきい値 (±)", min_value=1, value=10, step=1)
 
-                            sorted_yms = sorted(list(full_df['ym'].unique()))
-                            if len(sorted_yms) < 2:
-                                st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
+                            if 'ym' not in full_df.columns:
+                                st.error("エラー：データ内に年月情報(ym)が見つかりません。データの再取得を試してください。")
                             else:
-                                alert_list = []
-                                for uid, group in full_df.groupby('user_id'):
-                                    u_name = group['user_name'].iloc[-1]
-                                    lv_map = group.set_index('ym')['level'].to_dict()
-                                    u_rank = rank_map.get(uid, "-")
-                                    
-                                    for i in range(len(sorted_yms) - 1):
-                                        prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
-                                        prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
-                                        diff = curr_lv - prev_lv
-                                        
-                                        if abs(diff) >= threshold:
-                                            kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
-                                            alert_list.append({
-                                                "順位": u_rank, "ユーザー名": u_name, "種別": kind_html,
-                                                "前月": prev_m, "前月Lv": prev_lv, "当月": curr_m, "当月Lv": curr_lv, "変動": f"{diff:+d}"
-                                            })
-                                
-                                if alert_list:
-                                    alert_html = "<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
-                                    for a in alert_list:
-                                        alert_html += f"<tr><td style='text-align:center;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
-                                    alert_html += "</tbody></table></div>"
-                                    st.markdown(alert_html, unsafe_allow_html=True)
+                                sorted_yms = sorted(list(full_df['ym'].unique()))
+                                if len(sorted_yms) < 2:
+                                    st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
                                 else:
-                                    st.info(f"条件（レベル変動±{threshold}以上）に該当するユーザーはいませんでした。")
+                                    alert_list = []
+                                    for uid, group in full_df.groupby('user_id'):
+                                        u_name = group['user_name'].iloc[-1]
+                                        lv_map = group.set_index('ym')['level'].to_dict()
+                                        u_rank = rank_map.get(uid, "-")
+                                        
+                                        for i in range(len(sorted_yms) - 1):
+                                            prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
+                                            prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
+                                            diff = curr_lv - prev_lv
+                                            
+                                            if abs(diff) >= threshold:
+                                                kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
+                                                alert_list.append({
+                                                    "順位": u_rank, "ユーザー名": u_name, "種別": kind_html,
+                                                    "前月": prev_m, "前月Lv": prev_lv, "当月": curr_m, "当月Lv": curr_lv, "変動": f"{diff:+d}"
+                                                })
+                                    
+                                    if alert_list:
+                                        # HTMLテーブルでアラートを表示
+                                        alert_html = f"{table_style}<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
+                                        for a in alert_list:
+                                            alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
+                                        alert_html += "</tbody></table></div>"
+                                        st.markdown(alert_html, unsafe_allow_html=True)
+                                    else:
+                                        st.info(f"条件（レベル変動±{threshold}以上）に該当するユーザーはいませんでした。")
 
                             # --- 🔍 特定ユーザーの詳細分析 ---
                             st.write("---")
                             st.markdown("#### 🔍 特定ユーザーの詳細推移")
                             
-                            # セレクトボックス内の表示を「○位：ユーザー名(ID)」に変更
+                            # セレクトボックスの表示を「○位：名前 (ID)」に変更
                             user_options = {str(row['user_id']): f"{row['順位']}位：{row['ユーザー名']} ({row['user_id']})" for _, row in analysis_df.iterrows()}
                             target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
                             
@@ -273,7 +280,8 @@ if st.session_state.show_stats_view:
                                 col_left, col_right = st.columns([1, 2])
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
-                                    u_table_html = "<div class='scroll-table' style='max-height:300px;'><table><thead><tr><th>対象月</th><th>レベル</th></tr></thead><tbody>"
+                                    # HTMLテーブルで詳細推移を表示
+                                    u_table_html = f"{table_style}<div class='scroll-table' style='max-height:300px;'><table><thead><tr><th>対象月</th><th>レベル</th></tr></thead><tbody>"
                                     for _, u_row in u_data.iterrows():
                                         u_table_html += f"<tr><td style='text-align:center; font-weight:bold;'>{u_row['ym']}</td><td style='text-align:center;'>{u_row['level']}</td></tr>"
                                     u_table_html += "</tbody></table></div>"
