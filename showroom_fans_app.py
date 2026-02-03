@@ -189,72 +189,123 @@ if st.session_state.show_stats_view:
                         st.session_state.show_detail_analysis = True
 
                     if st.session_state.show_detail_analysis:
-                        # タイトル加工
                         st.markdown("### 🧬 ファンデータ詳細分析")
-                        st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
                         
                         if all_fans_data_for_analysis:
+                            # 1. 基礎データフレーム作成
                             full_df = pd.DataFrame(all_fans_data_for_analysis)
-                            
-                            # 合算ランキング作成（user_idで集計）
+                            # ymカラムを確実に作成
+                            if 'ym' not in full_df.columns:
+                                # APIデータからymが取れない場合の予備処理（stats収集時に付与しておくのが理想）
+                                pass 
+
+                            # --- 🏆 合算ランキング表示 ---
+                            st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
                             analysis_df = full_df.groupby('user_id').agg({
                                 'level': ['sum', 'mean', 'count'],
                                 'user_name': 'first',
                                 'avatar_id': 'first'
                             }).reset_index()
-                            
                             analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
-                            
-                            # フィルタリングと順位付け（同値は同じ順位にする method='min'）
                             analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
                             analysis_df['順位'] = analysis_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
                             analysis_df = analysis_df.sort_values('順位', ascending=True).reset_index(drop=True)
 
-                            # スクロール可能なテーブル（見出し固定）の構築
-                            table_style = """
-                            <style>
-                            .scroll-table {
-                                max-height: 70vh;
-                                overflow-y: auto;
-                                border: 1px solid #e5e7eb;
-                                position: relative;
-                            }
-                            .scroll-table table {
-                                width: 100%;
-                                border-collapse: collapse;
-                                font-size: 14px;
-                            }
-                            .scroll-table thead th {
-                                position: sticky;
-                                top: 0;
-                                background-color: #f3f4f6;
-                                z-index: 1;
-                                border-bottom: 2px solid #e5e7eb;
-                                padding: 10px;
-                            }
-                            .scroll-table td {
-                                padding: 8px;
-                                border-bottom: 1px solid #f0f0f0;
-                            }
-                            </style>
-                            """
-                            
-                            table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr>"
-                            table_html_detail += "<th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th>"
-                            table_html_detail += "</tr></thead><tbody>"
-                            
+                            # スクロールテーブル表示（前回のCSSを流用）
+                            table_style = "<style>.scroll-table { max-height: 40vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
+                            table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
                             for _, row in analysis_df.iterrows():
-                                table_html_detail += f"<tr>"
-                                table_html_detail += f"<td style='text-align:center; font-weight:bold;'>{row['順位']}</td>"
-                                table_html_detail += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='35'></td>"
-                                table_html_detail += f"<td style='text-align:left;'>{row['ユーザー名']}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{row['レベル合計値']:,}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{row['平均レベル']:.1f}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{int(row['ファン回数'])}回</td>"
-                                table_html_detail += f"</tr>"
-                            
+                                table_html_detail += f"<tr><td style='text-align:center; font-weight:bold;'>{row['順位']}</td><td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td><td>{row['ユーザー名']}</td><td style='text-align:center;'>{row['レベル合計値']:,}</td><td style='text-align:center;'>{row['平均レベル']:.1f}</td><td style='text-align:center;'>{int(row['ファン回数'])}回</td></tr>"
                             table_html_detail += "</tbody></table></div>"
                             st.markdown(table_html_detail, unsafe_allow_html=True)
+
+                            # --- 📈 レベル変動（急上昇・急下落）分析 ---
+                            st.write("---")
+                            st.markdown("#### 📈 レベル急変動アラート <span style='font-size: 0.6em; color: gray;'>(前月比±10以上)</span>", unsafe_allow_html=True)
+                            
+                            sorted_yms = sorted(list(full_df['ym'].unique()))
+                            if len(sorted_yms) < 2:
+                                st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
+                            else:
+                                alert_list = []
+                                # ユーザーごとに月ごとのレベルを抽出
+                                for uid, group in full_df.groupby('user_id'):
+                                    u_name = group['user_name'].iloc[-1]
+                                    # 月ごとのレベルMap作成
+                                    lv_map = group.set_index('ym')['level'].to_dict()
+                                    
+                                    for i in range(len(sorted_yms) - 1):
+                                        prev_m = sorted_yms[i]
+                                        curr_m = sorted_yms[i+1]
+                                        
+                                        prev_lv = lv_map.get(prev_m, 0)
+                                        curr_lv = lv_map.get(curr_m, 0)
+                                        diff = curr_lv - prev_lv
+                                        
+                                        if abs(diff) >= 10:
+                                            kind = "🚀 大幅上昇" if diff > 0 else "🔻 大幅下落"
+                                            alert_list.append({
+                                                "ユーザー名": u_name,
+                                                "種別": kind,
+                                                "前月": prev_m,
+                                                "前月Lv": prev_lv,
+                                                "当月": curr_m,
+                                                "当月Lv": curr_lv,
+                                                "変動幅": f"{diff:+d}",
+                                                "user_id": uid
+                                            })
+                                
+                                if alert_list:
+                                    alert_df = pd.DataFrame(alert_list)
+                                    def style_alert(val):
+                                        color = '#ff9999' if "下落" in str(val) else '#99ff99'
+                                        return f'background-color: {color}; color: black; font-weight: bold;'
+                                    
+                                    st.dataframe(
+                                        alert_df.style.map(style_alert, subset=['種別']),
+                                        use_container_width=True, hide_index=True
+                                    )
+                                else:
+                                    st.info("条件（レベル変動±10以上）に該当するユーザーはいませんでした。")
+
+                            # --- 🔍 特定ユーザーの詳細分析 ---
+                            st.write("---")
+                            st.markdown("#### 🔍 特定ユーザーの詳細推移")
+                            
+                            user_options = {str(row['user_id']): f"{row['ユーザー名']} ({row['user_id']})" for _, row in analysis_df.iterrows()}
+                            target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
+                            
+                            if target_uid:
+                                u_data = full_df[full_df['user_id'].astype(str) == target_uid].copy()
+                                u_data = u_data.sort_values('ym')
+                                
+                                col_left, col_right = st.columns([1, 2])
+                                
+                                with col_left:
+                                    st.write("##### 📋 月別レベル一覧")
+                                    st.dataframe(
+                                        u_data[['ym', 'level']].rename(columns={'ym':'対象月', 'level':'レベル'}),
+                                        hide_index=True, use_container_width=True
+                                    )
+                                
+                                with col_right:
+                                    st.write("##### 📈 レベル推移グラフ")
+                                    line_fig = go.Figure()
+                                    line_fig.add_trace(go.Scatter(
+                                        x=u_data['ym'], y=u_data['level'],
+                                        mode='lines+markers+text',
+                                        text=u_data['level'],
+                                        textposition="top center",
+                                        line=dict(color='#FF4B4B', width=3),
+                                        name="ファンレベル"
+                                    ))
+                                    line_fig.update_layout(
+                                        xaxis_title="年月", yaxis_title="レベル",
+                                        height=300, margin=dict(l=20, r=20, t=30, b=20),
+                                        template="plotly_white"
+                                    )
+                                    st.plotly_chart(line_fig, use_container_width=True)
+
                         else:
                             st.warning("詳細分析用のデータが取得できていません。")
 
