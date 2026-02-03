@@ -143,6 +143,9 @@ if st.session_state.show_stats_view:
                             "ファン名称": data.get("fan_name", "-")
                         })
                         users = data.get("users", [])
+                        # --- 【修正点1】 各ユーザーデータに年月(ym)を注入してエラーを回避 ---
+                        for u in users:
+                            u['ym'] = m
                         all_fans_data_for_analysis.extend(users)
                 
                 if stats_list:
@@ -194,10 +197,6 @@ if st.session_state.show_stats_view:
                         if all_fans_data_for_analysis:
                             # 1. 基礎データフレーム作成
                             full_df = pd.DataFrame(all_fans_data_for_analysis)
-                            # ymカラムを確実に作成
-                            if 'ym' not in full_df.columns:
-                                # APIデータからymが取れない場合の予備処理（stats収集時に付与しておくのが理想）
-                                pass 
 
                             # --- 🏆 合算ランキング表示 ---
                             st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
@@ -211,8 +210,8 @@ if st.session_state.show_stats_view:
                             analysis_df['順位'] = analysis_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
                             analysis_df = analysis_df.sort_values('順位', ascending=True).reset_index(drop=True)
 
-                            # スクロールテーブル表示（前回のCSSを流用）
-                            table_style = "<style>.scroll-table { max-height: 40vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
+                            # --- 【修正点2】 CSSのmax-heightを70vhに固定し、テーブル構造を維持 ---
+                            table_style = "<style>.scroll-table { max-height: 70vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
                             table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
                             for _, row in analysis_df.iterrows():
                                 table_html_detail += f"<tr><td style='text-align:center; font-weight:bold;'>{row['順位']}</td><td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td><td>{row['ユーザー名']}</td><td style='text-align:center;'>{row['レベル合計値']:,}</td><td style='text-align:center;'>{row['平均レベル']:.1f}</td><td style='text-align:center;'>{int(row['ファン回数'])}回</td></tr>"
@@ -228,16 +227,13 @@ if st.session_state.show_stats_view:
                                 st.info("レベルの変動を分析するには、2ヶ月以上のデータを選択してください。")
                             else:
                                 alert_list = []
-                                # ユーザーごとに月ごとのレベルを抽出
                                 for uid, group in full_df.groupby('user_id'):
                                     u_name = group['user_name'].iloc[-1]
-                                    # 月ごとのレベルMap作成
                                     lv_map = group.set_index('ym')['level'].to_dict()
                                     
                                     for i in range(len(sorted_yms) - 1):
                                         prev_m = sorted_yms[i]
                                         curr_m = sorted_yms[i+1]
-                                        
                                         prev_lv = lv_map.get(prev_m, 0)
                                         curr_lv = lv_map.get(curr_m, 0)
                                         diff = curr_lv - prev_lv
@@ -280,7 +276,6 @@ if st.session_state.show_stats_view:
                                 u_data = u_data.sort_values('ym')
                                 
                                 col_left, col_right = st.columns([1, 2])
-                                
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
                                     st.dataframe(
