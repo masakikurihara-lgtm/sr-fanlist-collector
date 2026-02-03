@@ -252,7 +252,7 @@ if st.session_state.show_stats_view:
                             analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
 
                             # 以降の処理（フィルタ・順位付け）
-                            analysis_df = analysis_df[analysis_df['レベル合計値'] >= 5]
+                            analysis_df = analysis_df[analysis_df['レベル合計値'] >= 0]
                             analysis_df['順位'] = analysis_df['レベル合計値'].rank(method='min', ascending=False).astype(int)
                             analysis_df = analysis_df.sort_values('順位', ascending=True).reset_index(drop=True)
 
