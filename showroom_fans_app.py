@@ -238,11 +238,11 @@ if st.session_state.show_stats_view:
                             st.markdown("#### 🏆 合算ランキング <span style='font-size: 0.6em; color: gray;'>(選択月累計)</span>", unsafe_allow_html=True)
 
                             # 修正：aggの中でlambdaを使用して「レベル10以上の月数」をカウントする
+
                             analysis_df = full_df.groupby('user_id').agg({
                                 'level': [
                                     ('レベル合計値', 'sum'),
-                                    ('平均レベル', 'mean'),
-                                    ('ファン回数', lambda x: (x >= 10).sum()) # レベル10以上のレコード数のみカウント
+                                    ('ファン回数', lambda x: (x >= 10).sum())
                                 ],
                                 'user_name': 'first',
                                 'avatar_id': 'first'
@@ -250,6 +250,8 @@ if st.session_state.show_stats_view:
 
                             # マルチカラムをフラット化
                             analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
+                            
+                            analysis_df['平均レベル'] = analysis_df['レベル合計値'] / len(selected_months)
 
                             # 以降の処理（フィルタ・順位付け）
                             analysis_df = analysis_df[analysis_df['レベル合計値'] >= 0]
