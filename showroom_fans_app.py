@@ -249,7 +249,7 @@ if st.session_state.show_stats_view:
                             }).reset_index()
 
                             # マルチカラムをフラット化
-                            analysis_df.columns = ['user_id', 'レベル合計値', '平均レベル', 'ファン回数', 'ユーザー名', 'アバター']
+                            analysis_df.columns = ['user_id', 'レベル合計値', 'ファン回数', 'ユーザー名', 'アバター']
                             
                             analysis_df['平均レベル'] = analysis_df['レベル合計値'] / len(selected_months)
 
