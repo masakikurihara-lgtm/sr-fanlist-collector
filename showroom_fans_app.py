@@ -344,23 +344,32 @@ if st.session_state.show_stats_view:
                             # --- 🔍 特定ユーザーの詳細分析 ---
                             st.write("---")
                             st.markdown("#### 🔍 特定ユーザーの詳細推移")
-                            
-                            user_options = {str(int(row['user_id'])): f"{row['順位']}位：{row['ユーザー名']} ({int(row['user_id'])})" for _, row in analysis_df.iterrows()}
-                            target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
-                            
+
+                            # 1. ユーザー選択リスト作成（表示上だけ整数にする）
+                            user_options = {
+                                str(row['user_id']): f"{int(row['順位'])}位：{row['ユーザー名']} ({int(row['user_id'])})" 
+                                for _, row in analysis_df.iterrows()
+                            }
+
+                            target_uid = st.selectbox(
+                                "分析するユーザーを選択", 
+                                options=list(user_options.keys()), 
+                                format_func=lambda x: user_options[x],
+                                key="user_selector"
+                            )
+
                             if target_uid:
-                                # 1. 選択されたユーザーの既存データを取得
-                                u_data_existing = full_df[full_df['user_id'].astype(str) == target_uid].copy()
+                                # 2. 【重要】比較対象の型を合わせる（target_uidは文字列、full_df['user_id']も文字列にキャストして比較）
+                                u_data_existing = full_df[full_df['user_id'].astype(str) == str(target_uid)].copy()
                                 
-                                # 2. 【重要】全期間(sorted_yms)の器を作成し、データがない月をレベル0で埋める
-                                # これにより、データがない月もグラフと表に強制的に表示されます
+                                # 3. 全期間(sorted_yms)の器を作成し、データがない月をレベル0で埋める
                                 plot_data = []
                                 for ym in sorted_yms:
                                     row = u_data_existing[u_data_existing['ym'] == ym]
                                     if not row.empty:
-                                        plot_data.append({"ym": ym, "level": row['level'].values[0]})
+                                        # 取得したレベルを数値として保持
+                                        plot_data.append({"ym": ym, "level": int(row['level'].values[0])})
                                     else:
-                                        # データがない月はレベル0として扱う
                                         plot_data.append({"ym": ym, "level": 0})
                                 
                                 # グラフ用(昇順)とテーブル用(降順)のDFを作成
