@@ -240,9 +240,8 @@ if st.session_state.show_stats_view:
                                     for uid, group in full_df.groupby('user_id'):
                                         u_name = group['user_name'].iloc[-1]
                                         lv_map = group.set_index('ym')['level'].to_dict()
-                                        u_rank = rank_map.get(uid, 999999) # 圏外は非常に大きな数にして下に送る
+                                        u_rank = rank_map.get(uid, 999999) 
                                         
-                                        # 全月ペアをチェック（全ての変動を抽出）
                                         for i in range(len(sorted_yms) - 1):
                                             prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
                                             prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
@@ -254,23 +253,23 @@ if st.session_state.show_stats_view:
                                                     "順位": u_rank if u_rank != 999999 else "-",
                                                     "ユーザー名": u_name,
                                                     "種別": kind_html,
-                                                    "前月": prev_m,
-                                                    "前月Lv": prev_lv,
                                                     "当月": curr_m,
                                                     "当月Lv": curr_lv,
+                                                    "前月": prev_m,
+                                                    "前月Lv": prev_lv,
                                                     "変動": f"{diff:+d}",
                                                     "raw_rank": u_rank,
                                                     "raw_month": curr_m
                                                 })
                                     
                                     if alert_list:
-                                        # 【修正】1.順位（昇順:1位が上） 2.月（降順:新しい月が上）
-                                        # Pythonのsortは安定ソートなので、優先度の低い順に並べ替えるか、tupleで指定します。
-                                        alert_list.sort(key=lambda x: (x['raw_rank'], -int(x['raw_month'].replace('/',''))))
+                                        alert_list.sort(key=lambda x: (x['raw_rank'], -int(str(x['raw_month']).replace('/',''))))
                                         
-                                        alert_html = f"{table_style}<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>当月</th><th>当月Lv</th><th>前月</th><th>前月Lv</th><th>変動</th></tr></thead><tbody>"
+                                        # 【修正箇所】<thead>内の並び順を「前月」が先、「当月」が後に変更
+                                        alert_html = f"{table_style}<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
                                         for a in alert_list:
-                                            alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
+                                            # 【修正箇所】<td>内の変数も、ヘッダーに合わせて「前月」を左、「当月」を右に配置
+                                            alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
                                         alert_html += "</tbody></table></div>"
                                         st.markdown(alert_html, unsafe_allow_html=True)
                                     else:
