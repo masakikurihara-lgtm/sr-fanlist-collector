@@ -384,31 +384,19 @@ if start_button:
                 )
 
                 # 外側に70vhのスクロール用divを追加し、thにsticky（見出し固定）を適用
-                # 最上部の線が見えるよう、divに上部ボーダーを追加
-                table_html = "<div style='max-height: 70vh; overflow-y: auto; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;'>"
+                table_html = "<div style='max-height: 70vh; overflow-y: auto; border-bottom: 1px solid #ccc;'>"
                 table_html += "<table style='width:100%; border-collapse:collapse;'>"
                 table_html += "<thead><tr style='background-color:#f3f4f6;'>"
                 for col in display_df.columns:
-                    # position: sticky使用時、最上部の線が消えないよう box-shadow で線を補強
-                    table_html += f"""
-                        <th style='
-                            border-bottom: 1px solid #ccc; 
-                            padding: 4px; 
-                            text-align: center; 
-                            position: sticky; 
-                            top: 0; 
-                            background-color: #f3f4f6; 
-                            z-index: 1;
-                            box-shadow: inset 0 1px 0 #ccc, inset 0 -1px 0 #ccc;
-                        '>{col}</th>
-                    """
+                    # 見出しを固定するためのスタイル（position: sticky）を追加
+                    table_html += f"<th style='border-bottom:1px solid #ccc; padding:4px; text-align:center; position: sticky; top: 0; background-color: #f3f4f6; z-index: 1;'>{col}</th>"
                 table_html += "</tr></thead><tbody>"
                 for idx, row in display_df.iterrows():
                     table_html += "<tr>"
-                    table_html += f"<td style='border-bottom: 1px solid #eee; text-align:center;'>{row['順位']}</td>"
-                    table_html += f"<td style='border-bottom: 1px solid #eee; text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='40'></td>"
-                    table_html += f"<td style='border-bottom: 1px solid #eee; text-align:center;'>{row['レベル合計値']}</td>"
-                    table_html += f"<td style='border-bottom: 1px solid #eee; text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
+                    table_html += f"<td style='text-align:center;'>{row['順位']}</td>"
+                    table_html += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='40'></td>"
+                    table_html += f"<td style='text-align:center;'>{row['レベル合計値']}</td>"
+                    table_html += f"<td style='text-align:left; padding-left:8px;'>{row['ユーザー名']}</td>"
                     table_html += "</tr>"
                 table_html += "</tbody></table></div>"
 
