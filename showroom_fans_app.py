@@ -300,15 +300,33 @@ if st.session_state.show_stats_view:
                             target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
                             
                             if target_uid:
-                                u_data_graph = full_df[full_df['user_id'].astype(str) == target_uid].copy().sort_values('ym')
-                                u_data_table = u_data_graph.sort_values('ym', ascending=False)
+                                # 1. 選択されたユーザーの既存データを取得
+                                u_data_existing = full_df[full_df['user_id'].astype(str) == target_uid].copy()
+                                
+                                # 2. 【重要】全期間(sorted_yms)の器を作成し、データがない月をレベル0で埋める
+                                # これにより、データがない月もグラフと表に強制的に表示されます
+                                plot_data = []
+                                for ym in sorted_yms:
+                                    row = u_data_existing[u_data_existing['ym'] == ym]
+                                    if not row.empty:
+                                        plot_data.append({"ym": ym, "level": row['level'].values[0]})
+                                    else:
+                                        # データがない月はレベル0として扱う
+                                        plot_data.append({"ym": ym, "level": 0})
+                                
+                                # グラフ用(昇順)とテーブル用(降順)のDFを作成
+                                u_full_display_df = pd.DataFrame(plot_data)
+                                u_data_graph = u_full_display_df.sort_values('ym')
+                                u_data_table = u_full_display_df.sort_values('ym', ascending=False)
                                 
                                 col_left, col_right = st.columns([1, 2])
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
                                     u_table_html = f"{table_style}<div class='scroll-table' style='max-height:300px;'><table><thead><tr><th>対象月</th><th>レベル</th></tr></thead><tbody>"
                                     for _, u_row in u_data_table.iterrows():
-                                        u_table_html += f"<tr><td style='text-align:center; font-weight:bold;'>{u_row['ym']}</td><td style='text-align:center;'>{u_row['level']}</td></tr>"
+                                        # レベル0は強調するなど、視認性を上げることも可能です
+                                        lv_display = u_row['level']
+                                        u_table_html += f"<tr><td style='text-align:center; font-weight:bold;'>{u_row['ym']}</td><td style='text-align:center;'>{lv_display}</td></tr>"
                                     u_table_html += "</tbody></table></div>"
                                     st.markdown(u_table_html, unsafe_allow_html=True)
                                 
@@ -318,13 +336,16 @@ if st.session_state.show_stats_view:
                                     line_fig.add_trace(go.Scatter(
                                         x=u_data_graph['ym'], y=u_data_graph['level'], mode='lines+markers+text',
                                         text=u_data_graph['level'], textposition="top center",
-                                        line=dict(color='#FF4B4B', width=3), name="ファンレベル"
+                                        line=dict(color='#FF4B4B', width=3), name="ファンレベル",
+                                        connectgaps=True # 念のため隙間を繋ぐ設定
                                     ))
+                                    
                                     max_lv = u_data_graph['level'].max()
                                     line_fig.update_layout(
                                         xaxis_title="年月", yaxis_title="レベル", height=300, 
                                         margin=dict(l=20, r=20, t=40, b=20),
-                                        yaxis=dict(range=[0, max_lv + (max_lv * 0.2) + 2]),
+                                        # y軸の最小値を0に固定し、レベル0が底辺に見えるようにする
+                                        yaxis=dict(range=[0, max_lv + (max_lv * 0.2) + 2] if max_lv > 0 else [0, 10]),
                                         template="plotly_white"
                                     )
                                     st.plotly_chart(line_fig, use_container_width=True)
