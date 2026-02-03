@@ -345,7 +345,7 @@ if st.session_state.show_stats_view:
                             st.write("---")
                             st.markdown("#### 🔍 特定ユーザーの詳細推移")
                             
-                            user_options = {str(row['user_id']): f"{row['順位']}位：{row['ユーザー名']} ({row['user_id']})" for _, row in analysis_df.iterrows()}
+                            user_options = {str(int(row['user_id'])): f"{row['順位']}位：{row['ユーザー名']} ({int(row['user_id'])})" for _, row in analysis_df.iterrows()}
                             target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
                             
                             if target_uid:
