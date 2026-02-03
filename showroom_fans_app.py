@@ -240,23 +240,34 @@ if st.session_state.show_stats_view:
                                     for uid, group in full_df.groupby('user_id'):
                                         u_name = group['user_name'].iloc[-1]
                                         lv_map = group.set_index('ym')['level'].to_dict()
-                                        u_rank = rank_map.get(uid, "-")
+                                        u_rank = rank_map.get(uid, 999999) # 圏外は非常に大きな数にして下に送る
                                         
-                                        # 新しい月から順にループ（逆順）
-                                        for i in range(len(sorted_yms) - 1, 0, -1):
-                                            curr_m, prev_m = sorted_yms[i], sorted_yms[i-1]
-                                            curr_lv, prev_lv = lv_map.get(curr_m, 0), lv_map.get(prev_m, 0)
+                                        # 全月ペアをチェック（全ての変動を抽出）
+                                        for i in range(len(sorted_yms) - 1):
+                                            prev_m, curr_m = sorted_yms[i], sorted_yms[i+1]
+                                            prev_lv, curr_lv = lv_map.get(prev_m, 0), lv_map.get(curr_m, 0)
                                             diff = curr_lv - prev_lv
                                             
                                             if abs(diff) >= threshold:
                                                 kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
                                                 alert_list.append({
-                                                    "順位": u_rank, "ユーザー名": u_name, "種別": kind_html, "当月": curr_m, "当月Lv": curr_lv, "前月": prev_m, "前月Lv": prev_lv, "変動": f"{diff:+d}", "sort_val": curr_m
+                                                    "順位": u_rank if u_rank != 999999 else "-",
+                                                    "ユーザー名": u_name,
+                                                    "種別": kind_html,
+                                                    "当月": curr_m,
+                                                    "当月Lv": curr_lv,
+                                                    "前月": prev_m,
+                                                    "前月Lv": prev_lv,
+                                                    "変動": f"{diff:+d}",
+                                                    "raw_rank": u_rank,
+                                                    "raw_month": curr_m
                                                 })
                                     
                                     if alert_list:
-                                        # 複数行ある場合、新しい当月が上に来るようにソート
-                                        alert_list.sort(key=lambda x: x['sort_val'], reverse=True)
+                                        # 【修正】1.順位（昇順:1位が上） 2.月（降順:新しい月が上）
+                                        # Pythonのsortは安定ソートなので、優先度の低い順に並べ替えるか、tupleで指定します。
+                                        alert_list.sort(key=lambda x: (x['raw_rank'], -int(x['raw_month'].replace('/',''))))
+                                        
                                         alert_html = f"{table_style}<div class='scroll-table' style='max-height:40vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>当月</th><th>当月Lv</th><th>前月</th><th>前月Lv</th><th>変動</th></tr></thead><tbody>"
                                         for a in alert_list:
                                             alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
@@ -273,7 +284,6 @@ if st.session_state.show_stats_view:
                             target_uid = st.selectbox("分析するユーザーを選択", options=list(user_options.keys()), format_func=lambda x: user_options[x])
                             
                             if target_uid:
-                                # データはグラフ用に昇順で持つが、表用には降順を作成
                                 u_data_graph = full_df[full_df['user_id'].astype(str) == target_uid].copy().sort_values('ym')
                                 u_data_table = u_data_graph.sort_values('ym', ascending=False)
                                 
@@ -294,12 +304,11 @@ if st.session_state.show_stats_view:
                                         text=u_data_graph['level'], textposition="top center",
                                         line=dict(color='#FF4B4B', width=3), name="ファンレベル"
                                     ))
-                                    # テキストが切れないよう、Y軸の最大値に余白（+5程度）を持たせる
                                     max_lv = u_data_graph['level'].max()
                                     line_fig.update_layout(
                                         xaxis_title="年月", yaxis_title="レベル", height=300, 
-                                        margin=dict(l=20, r=20, t=40, b=20), # 上部マージンを広げた
-                                        yaxis=dict(range=[0, max_lv + (max_lv * 0.15) + 2]), # 動的に上限を調整
+                                        margin=dict(l=20, r=20, t=40, b=20),
+                                        yaxis=dict(range=[0, max_lv + (max_lv * 0.2) + 2]),
                                         template="plotly_white"
                                     )
                                     st.plotly_chart(line_fig, use_container_width=True)
