@@ -299,6 +299,7 @@ if st.session_state.show_stats_view:
                             table_html_detail += "</tbody></table></div>"
                             st.markdown(table_html_detail, unsafe_allow_html=True)
 
+
                             # --- 📈 レベル変動（急上昇・急下落）分析 ---
                             st.write("---")
                             col_head1, col_head2 = st.columns([2, 1])
@@ -367,11 +368,26 @@ if st.session_state.show_stats_view:
                                         alert_html = f"{table_style}<div class='scroll-table' style='max-height:50vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
                                         for user_block in alert_list:
                                             for a in user_block['alerts']:
-                                                alert_html += f"<tr><td style='text-align:center; font-weight:bold;'>{a['順位']}</td><td>{a['ユーザー名']}</td><td style='text-align:center;'>{a['種別']}</td><td style='text-align:center;'>{a['前月']}</td><td style='text-align:center;'>{a['前月Lv']}</td><td style='text-align:center;'>{a['当月']}</td><td style='text-align:center;'>{a['当月Lv']}</td><td style='text-align:center; font-weight:bold;'>{a['変動']}</td></tr>"
+                                                # 安全なデータ抽出
+                                                u_name = str(a.get('ユーザー名', '不明'))
+                                                
+                                                # HTML組み立てを分割して安全性を確保
+                                                alert_html += "<tr>"
+                                                alert_html += f"<td style='text-align:center; font-weight:bold;'>{a['順位']}</td>"
+                                                alert_html += f"<td>{u_name}</td>"
+                                                alert_html += f"<td style='text-align:center;'>{a['種別']}</td>"
+                                                alert_html += f"<td style='text-align:center;'>{a['前月']}</td>"
+                                                alert_html += f"<td style='text-align:center;'>{a['前月Lv']}</td>"
+                                                alert_html += f"<td style='text-align:center;'>{a['当月']}</td>"
+                                                alert_html += f"<td style='text-align:center;'>{a['当月Lv']}</td>"
+                                                alert_html += f"<td style='text-align:center; font-weight:bold;'>{a['変動']}</td>"
+                                                alert_html += "</tr>"
+                                                
                                         alert_html += "</tbody></table></div>"
                                         st.markdown(alert_html, unsafe_allow_html=True)
                                     else:
                                         st.info(f"条件（レベル変動±{threshold}以上）に該当するユーザーはいませんでした。")
+
 
                             # --- 🔍 特定ユーザーの詳細分析 ---
                             st.write("---")
