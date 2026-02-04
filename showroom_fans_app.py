@@ -194,32 +194,36 @@ if st.session_state.show_stats_view:
                     if st.button("🔍 さらに詳細分析する", key="detail_analysis_btn"):
                         with st.spinner("詳細分析のため、全ファンデータを取得中..."):
                             full_analysis_data = []
+                            # メイン処理と同様、各月の全量取得を確実に完遂させる
                             for m in sorted(selected_months):
-                                # --- 【修正点1】最初にその月の総数を取得する ---
+                                # 1. 最初にその月の総数(target_total)を取得して固定
                                 init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset=0&limit=1"
                                 try:
                                     init_resp = requests.get(init_url)
                                     init_data = init_resp.json()
-                                    total_count = init_data.get("total_user_count", 0)
+                                    target_total = init_data.get("total_user_count", 0)
                                 except:
-                                    total_count = 0
+                                    target_total = 0
 
                                 retrieved = 0
-                                per_page = 100 
+                                # 2. APIの安定性を考慮し、メイン処理と同じ50に固定
+                                per_page = 50 
                                 
-                                # --- 【修正点2】取得数が総数に達するまで回す（while Trueをやめる） ---
-                                while retrieved < total_count:
+                                # 3. 目標数(target_total)に達するまでループを継続
+                                while retrieved < target_total:
                                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
                                     try:
                                         resp = requests.get(url)
                                         if resp.status_code != 200:
+                                            # エラー時は即終了せず少し待機してリトライの余地を残す（現状はメインに合わせbreak）
                                             break
+                                            
                                         data = resp.json()
                                         users = data.get("users", [])
                                         
                                         if not users:
-                                            # データが空でも、取得数が総数に達していなければオフセットを強引に進める
-                                            # (APIの一時的な空レスポンス対策)
+                                            # データが空でも目標数未達なら、オフセットだけ進めて継続
+                                            # これにより「偽の空レスポンス」によるLv1層の切り捨てを防ぐ
                                             retrieved += per_page
                                             continue
                                         
@@ -228,12 +232,14 @@ if st.session_state.show_stats_view:
                                             full_analysis_data.append(u)
                                         
                                         retrieved += len(users)
+                                        
+                                        # 4. メイン処理と同じ待機時間を入れ、API側の遮断を防ぐ
+                                        time.sleep(0.05)
+                                        
                                     except Exception:
                                         break
                                 
-                                # サーバー負荷軽減のため微小な待機（正常処理に合わせる）
-                                time.sleep(0.05)
-                                
+                            # 全取得データをセッションに格納
                             st.session_state.full_fans_data = full_analysis_data
                             st.session_state.show_detail_analysis = True
 
