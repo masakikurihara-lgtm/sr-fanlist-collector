@@ -331,7 +331,7 @@ if st.session_state.show_stats_view:
                             with col_head1:
                                 st.markdown("#### 📈 レベル急変動アラート")
                             with col_head2:
-                                threshold = st.number_input("検知しきい値 (±)", min_value=1, value=10, step=1)
+                                threshold = st.number_input("検知しきい値 (±)", min_value=1, value=7, step=1)
 
                             if 'ym' not in full_df.columns:
                                 st.error("エラー：データ内に年月情報が見つかりません。")
