@@ -8,6 +8,7 @@ import time
 import io
 from dateutil.relativedelta import relativedelta
 import plotly.graph_objects as go 
+import html # スクリプトの冒頭でインポート
 
 # ページ設定
 st.set_page_config(page_title="SHOWROOM ファンリスト取得", layout="wide")
@@ -311,11 +312,13 @@ if st.session_state.show_stats_view:
                             table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
                             
                             for _, row in analysis_df.iterrows():
-                                # 【修正】1行にまとめず、メイン処理と同じく分割して結合することでHTML崩れを完全に防ぐ
+                                # ユーザー名をHTMLエスケープ処理する
+                                safe_name = html.escape(str(row['ユーザー名']))
+                                
                                 table_html_detail += "<tr>"
                                 table_html_detail += f"<td style='text-align:center; font-weight:bold;'>{row['順位']}</td>"
                                 table_html_detail += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td>"
-                                table_html_detail += f"<td>{str(row['ユーザー名'])}</td>" # 文字列化で文字化け防止
+                                table_html_detail += f"<td>{safe_name}</td>" # ここをsafe_nameに変更
                                 table_html_detail += f"<td style='text-align:center;'>{row['レベル合計値']:,}</td>"
                                 table_html_detail += f"<td style='text-align:center;'>{row['平均レベル']:.1f}</td>"
                                 table_html_detail += f"<td style='text-align:center;'>{int(row['ファン回数'])}回</td>"
@@ -393,13 +396,12 @@ if st.session_state.show_stats_view:
                                         alert_html = f"{table_style}<div class='scroll-table' style='max-height:50vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
                                         for user_block in alert_list:
                                             for a in user_block['alerts']:
-                                                # 安全なデータ抽出
-                                                u_name = str(a.get('ユーザー名', '不明'))
+                                                # ユーザー名をHTMLエスケープ処理する
+                                                u_name = html.escape(str(a.get('ユーザー名', '不明')))
                                                 
-                                                # HTML組み立てを分割して安全性を確保
                                                 alert_html += "<tr>"
                                                 alert_html += f"<td style='text-align:center; font-weight:bold;'>{a['順位']}</td>"
-                                                alert_html += f"<td>{u_name}</td>"
+                                                alert_html += f"<td>{u_name}</td>" # ここをエスケープ済みの変数に
                                                 alert_html += f"<td style='text-align:center;'>{a['種別']}</td>"
                                                 alert_html += f"<td style='text-align:center;'>{a['前月']}</td>"
                                                 alert_html += f"<td style='text-align:center;'>{a['前月Lv']}</td>"
