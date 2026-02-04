@@ -204,59 +204,72 @@ if st.session_state.show_stats_view:
                     st.markdown("---")
 
                     if st.button("🔍 さらに詳細分析する", key="detail_analysis_btn"):
-                        with st.spinner("詳細分析のため、全ファンデータを取得中..."):
-                            full_analysis_data = []
-                            # 1. 各月の全量を「メイン処理と全く同じ方法」で取得
-                            for m in sorted(selected_months):
-                                # メイン処理にならい、最初にその月の総数を取得
+                        # 全体の進捗管理用
+                        total_months = len(selected_months)
+                        progress_bar = st.progress(0) # 進捗バー本体
+                        status_text = st.empty()      # テキスト表示用
+                        
+                        full_analysis_data = []
+                        
+                        # 各月の処理
+                        for i, m in enumerate(sorted(selected_months)):
+                            # 月ごとのステータス更新
+                            current_overall_progress = i / total_months
+                            status_text.info(f"⏳ データ取得中: {m} ({i+1}/{total_months}ヶ月目)")
+                            
+                            try:
+                                init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}"
+                                init_resp = requests.get(init_url)
+                                init_data = init_resp.json()
+                                count = init_data.get("count", 0) 
+                            except:
+                                count = 0
+
+                            retrieved = 0
+                            per_page = 50 
+
+                            while retrieved < count:
+                                # 月内の進捗を計算してバーに反映 (微細な動き)
+                                if count > 0:
+                                    sub_progress = (retrieved / count) * (1 / total_months)
+                                    progress_bar.progress(min(current_overall_progress + sub_progress, 1.0))
+                                
+                                url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
                                 try:
-                                    init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}"
-                                    init_resp = requests.get(init_url)
-                                    init_data = init_resp.json()
-                                    # メイン処理が使っているキー "count" に合わせる
-                                    count = init_data.get("count", 0) 
-                                except:
-                                    count = 0
-
-                                retrieved = 0
-                                per_page = 50 # メイン処理と同じ50に設定
-
-                                # 2. 【重要】while True ではなく、事前取得した count を基準に回す
-                                while retrieved < count:
-                                    url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
-                                    try:
-                                        resp = requests.get(url)
-                                        if resp.status_code != 200:
-                                            # エラーでも即終了せず、少し待ってリトライの余地を作る
-                                            time.sleep(1.0)
-                                            retrieved += per_page 
-                                            continue
-                                            
-                                        data = resp.json()
-                                        users = data.get("users", [])
-                                        
-                                        # 【重要】もしデータが空でも、retrievedがcountに達していなければ「まだ先がある」と判断して進む
-                                        if not users:
-                                            retrieved += per_page
-                                            continue
-                                        
-                                        for u in users:
-                                            u['ym'] = m
-                                            full_analysis_data.append(u)
-                                        
-                                        retrieved += len(users)
-                                        # メイン処理と同じウェイト
-                                        time.sleep(0.05)
-                                        
-                                    except Exception:
-                                        retrieved += per_page # 例外時もカウントを進めて穴を飛ばす
+                                    resp = requests.get(url)
+                                    if resp.status_code != 200:
+                                        time.sleep(1.0)
+                                        retrieved += per_page 
                                         continue
+                                        
+                                    data = resp.json()
+                                    users = data.get("users", [])
+                                    
+                                    if not users:
+                                        retrieved += per_page
+                                        continue
+                                    
+                                    for u in users:
+                                        u['ym'] = m
+                                        full_analysis_data.append(u)
+                                    
+                                    retrieved += len(users)
+                                    time.sleep(0.05)
+                                    
+                                except Exception:
+                                    retrieved += per_page
+                                    continue
+                            
+                            # その月が終わった時点の進捗に更新
+                            progress_bar.progress((i + 1) / total_months)
 
-                            # セッションに保存して分析へ
-                            st.session_state.full_fans_data = full_analysis_data
-                            st.session_state.show_detail_analysis = True
-                            # 強制再描画
-                            st.rerun()
+                        status_text.success("✅ 全データの取得が完了しました！")
+                        time.sleep(0.5) # 完了を視認させるための僅かな待ち
+                        
+                        # セッションに保存して分析へ
+                        st.session_state.full_fans_data = full_analysis_data
+                        st.session_state.show_detail_analysis = True
+                        st.rerun()
 
                     # 分析表示セクション
                     if st.session_state.get('show_detail_analysis', False):
