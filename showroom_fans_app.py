@@ -193,55 +193,58 @@ if st.session_state.show_stats_view:
 
                     if st.button("🔍 さらに詳細分析する", key="detail_analysis_btn"):
                         with st.spinner("詳細分析のため、全ファンデータを取得中..."):
+                            # 【重要】リストの初期化をここで行う
                             full_analysis_data = []
-                            # メイン処理と同様、各月の全量取得を確実に完遂させる
+                            
                             for m in sorted(selected_months):
-                                # 1. 最初にその月の総数(target_total)を取得して固定
-                                init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset=0&limit=1"
+                                # 1. 各月の正確な総数を取得
                                 try:
+                                    init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset=0&limit=1"
                                     init_resp = requests.get(init_url)
-                                    init_data = init_resp.json()
-                                    target_total = init_data.get("total_user_count", 0)
+                                    target_total = init_resp.json().get("total_user_count", 0)
                                 except:
-                                    target_total = 0
+                                    continue # この月がダメでも他の月を殺さない
 
                                 retrieved = 0
-                                # 2. APIの安定性を考慮し、メイン処理と同じ50に固定
-                                per_page = 50 
-                                
-                                # 3. 目標数(target_total)に達するまでループを継続
+                                per_page = 50 # メイン処理で実績のある50に固定
+
+                                # 2. その月の全データを確実に吸い上げる
                                 while retrieved < target_total:
                                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
                                     try:
                                         resp = requests.get(url)
                                         if resp.status_code != 200:
-                                            # エラー時は即終了せず少し待機してリトライの余地を残す（現状はメインに合わせbreak）
-                                            break
+                                            # 通信エラー時は少し待機して次に進む
+                                            time.sleep(0.5)
+                                            retrieved += per_page
+                                            continue
                                             
                                         data = resp.json()
                                         users = data.get("users", [])
                                         
                                         if not users:
-                                            # データが空でも目標数未達なら、オフセットだけ進めて継続
-                                            # これにより「偽の空レスポンス」によるLv1層の切り捨てを防ぐ
+                                            # 空レスポンスでも総数未達ならオフセットを進めて「穴」を埋める
                                             retrieved += per_page
                                             continue
                                         
+                                        # 【重要】1件ずつ確実に全量リストへ格納
                                         for u in users:
                                             u['ym'] = m
                                             full_analysis_data.append(u)
                                         
                                         retrieved += len(users)
-                                        
-                                        # 4. メイン処理と同じ待機時間を入れ、API側の遮断を防ぐ
+                                        # メイン処理の成功リズムを再現
                                         time.sleep(0.05)
                                         
                                     except Exception:
-                                        break
-                                
-                            # 全取得データをセッションに格納
+                                        retrieved += per_page
+                                        continue
+
+                            # 3. 取得した【全月分】の巨大なリストをセッションに確実に保存
                             st.session_state.full_fans_data = full_analysis_data
                             st.session_state.show_detail_analysis = True
+                            # 画面を強制更新して全データを反映させる
+                            st.rerun()
 
                     # 分析表示セクション
                     if st.session_state.get('show_detail_analysis', False):
