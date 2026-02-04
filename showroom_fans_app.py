@@ -191,38 +191,49 @@ if st.session_state.show_stats_view:
                     # --- 追加分析セクション ---
                     st.markdown("---")
 
-                    # ボタンに一意の key="detail_analysis_btn" を追加
                     if st.button("🔍 さらに詳細分析する", key="detail_analysis_btn"):
-                        # ボタンが押されたときだけ全量取得を実行
                         with st.spinner("詳細分析のため、全ファンデータを取得中..."):
                             full_analysis_data = []
-                            # 前段で選択済みの room_id, selected_months を流用
                             for m in sorted(selected_months):
+                                # --- 【修正点1】最初にその月の総数を取得する ---
+                                init_url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset=0&limit=1"
+                                try:
+                                    init_resp = requests.get(init_url)
+                                    init_data = init_resp.json()
+                                    total_count = init_data.get("total_user_count", 0)
+                                except:
+                                    total_count = 0
+
                                 retrieved = 0
                                 per_page = 100 
                                 
-                                while True:
+                                # --- 【修正点2】取得数が総数に達するまで回す（while Trueをやめる） ---
+                                while retrieved < total_count:
                                     url = f"https://www.showroom-live.com/api/active_fan/users?room_id={room_id}&ym={m}&offset={retrieved}&limit={per_page}"
                                     try:
                                         resp = requests.get(url)
+                                        if resp.status_code != 200:
+                                            break
                                         data = resp.json()
                                         users = data.get("users", [])
-                                        total = data.get("total_user_count", 0)
                                         
                                         if not users:
-                                            break
+                                            # データが空でも、取得数が総数に達していなければオフセットを強引に進める
+                                            # (APIの一時的な空レスポンス対策)
+                                            retrieved += per_page
+                                            continue
                                         
                                         for u in users:
                                             u['ym'] = m
                                             full_analysis_data.append(u)
                                         
                                         retrieved += len(users)
-                                        if retrieved >= total:
-                                            break
                                     except Exception:
                                         break
-                            
-                            # 取得した全量データをセッションに保存
+                                
+                                # サーバー負荷軽減のため微小な待機（正常処理に合わせる）
+                                time.sleep(0.05)
+                                
                             st.session_state.full_fans_data = full_analysis_data
                             st.session_state.show_detail_analysis = True
 
