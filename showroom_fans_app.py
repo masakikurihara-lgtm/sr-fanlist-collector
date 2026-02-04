@@ -284,25 +284,18 @@ if st.session_state.show_stats_view:
                             table_style = "<style>.scroll-table { max-height: 70vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
                             
                             table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
-                            for _, row in analysis_df.iterrows():
-                                # 各値を安全な形式に整形
-                                avatar_id = str(row['アバター'])
-                                user_name = str(row['ユーザー名'])
-                                l_total = int(row['レベル合計値'])
-                                l_avg = float(row['平均レベル'])
-                                f_count = int(row['ファン回数'])
-                                rank = row['順位']
-
-                                # 文字列結合を分けてHTML崩れを防止
-                                table_html_detail += f"<tr>"
-                                table_html_detail += f"<td style='text-align:center; font-weight:bold;'>{rank}</td>"
-                                table_html_detail += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{avatar_id}.png' width='30'></td>"
-                                table_html_detail += f"<td>{user_name}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{l_total:,}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{l_avg:.1f}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{f_count}回</td>"
-                                table_html_detail += f"</tr>"
                             
+                            for _, row in analysis_df.iterrows():
+                                # 【修正】1行にまとめず、メイン処理と同じく分割して結合することでHTML崩れを完全に防ぐ
+                                table_html_detail += "<tr>"
+                                table_html_detail += f"<td style='text-align:center; font-weight:bold;'>{row['順位']}</td>"
+                                table_html_detail += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td>"
+                                table_html_detail += f"<td>{str(row['ユーザー名'])}</td>" # 文字列化で文字化け防止
+                                table_html_detail += f"<td style='text-align:center;'>{row['レベル合計値']:,}</td>"
+                                table_html_detail += f"<td style='text-align:center;'>{row['平均レベル']:.1f}</td>"
+                                table_html_detail += f"<td style='text-align:center;'>{int(row['ファン回数'])}回</td>"
+                                table_html_detail += "</tr>"
+                                
                             table_html_detail += "</tbody></table></div>"
                             st.markdown(table_html_detail, unsafe_allow_html=True)
 
