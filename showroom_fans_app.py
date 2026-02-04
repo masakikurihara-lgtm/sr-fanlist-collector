@@ -91,6 +91,18 @@ while tmp_date >= start_date:
 # 月選択
 selected_months = st.multiselect("取得したい月を選択（複数選択可）:", options=month_labels, default=[])
 
+if "prev_room_id" not in st.session_state:
+    st.session_state.prev_room_id = room_id
+if "prev_selected_months" not in st.session_state:
+    st.session_state.prev_selected_months = selected_months
+
+if (room_id != st.session_state.prev_room_id) or (selected_months != st.session_state.prev_selected_months):
+    st.session_state.show_stats_view = False
+    st.session_state.show_detail_analysis = False
+    # 現在の値を保存
+    st.session_state.prev_room_id = room_id
+    st.session_state.prev_selected_months = selected_months
+
 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 # 処理を完全に分けるため、カラムでボタンを配置
