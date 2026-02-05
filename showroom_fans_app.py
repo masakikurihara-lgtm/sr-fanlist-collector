@@ -463,6 +463,19 @@ if st.session_state.show_stats_view:
                                             "当月_num": "当月"
                                         })
 
+                                        display_df = display_df[
+                                            [
+                                                "順位",
+                                                "ユーザー名",
+                                                "種別",
+                                                "前月",
+                                                "前月Lv",
+                                                "当月",
+                                                "当月Lv",
+                                                "変動",
+                                            ]
+                                        ]
+
                                         st.dataframe(
                                             display_df.style.map(highlight_kind, subset=["種別"]),
                                             use_container_width=True,
