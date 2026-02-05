@@ -393,18 +393,16 @@ if st.session_state.show_stats_view:
                                             
                                             # 絶対値でしきい値を判定（これで 5→8 の +3 も拾えるようになる）
                                             if abs(diff) >= threshold:
-                                                kind_html = f"<span style='color:#ef4444; font-weight:bold;'>🚀大幅上昇</span>" if diff > 0 else f"<span style='color:#3b82f6; font-weight:bold;'>🔻大幅下落</span>"
+                                                kind = "🚀大幅上昇" if diff > 0 else "🔻大幅下落"
                                                 user_temp_alerts.append({
-                                                    "順位": u_rank if u_rank != 999999 else "-",
+                                                    "順位": u_rank if u_rank != 999999 else 999999,
                                                     "ユーザー名": u_name,
-                                                    "種別": kind_html,
+                                                    "種別": kind,
                                                     "前月": prev_m,
                                                     "前月Lv": prev_lv,
                                                     "当月": curr_m,
                                                     "当月Lv": curr_lv,
-                                                    "変動": f"{diff:+d}",
-                                                    "raw_rank": u_rank,
-                                                    "raw_month": curr_m
+                                                    "変動": diff
                                                 })
                                         
                                         if user_temp_alerts:
@@ -433,7 +431,7 @@ if st.session_state.show_stats_view:
 
                                         alert_df = pd.DataFrame(rows)
 
-                                        alert_df["_rank"] = alert_df["順位"].replace("-", 999999).astype(int)
+                                        alert_df["_rank"] = alert_df["順位"]
                                         alert_df["_month"] = alert_df["当月"].str.replace("/", "").astype(int)
 
                                         alert_df = alert_df.sort_values(
@@ -441,11 +439,58 @@ if st.session_state.show_stats_view:
                                             ascending=[True, False]
                                         ).drop(columns=["_rank", "_month"])
 
+                                        def highlight_kind(val):
+                                            if "上昇" in str(val):
+                                                return "background-color: #99ff99; font-weight: bold;"
+                                            if "下落" in str(val):
+                                                return "background-color: #ffcccc; font-weight: bold;"
+                                            return ""
+
+                                        # 表示用に順位を整形（数値→表示だけ）
+                                        display_df = alert_df.copy()
+                                        display_df["順位"] = display_df["順位"].apply(lambda x: x if x != 999999 else "-")
+
                                         st.dataframe(
-                                            alert_df,
+                                            display_df.style.map(highlight_kind, subset=["種別"]),
                                             use_container_width=True,
                                             height=500,
-                                            hide_index=True
+                                            hide_index=True,
+                                            column_config={
+                                                "順位": st.column_config.NumberColumn(
+                                                    "順位",
+                                                    width="small",
+                                                    format="%d 位"
+                                                ),
+                                                "ユーザー名": st.column_config.TextColumn(
+                                                    "ユーザー名",
+                                                    width="large"
+                                                ),
+                                                "種別": st.column_config.TextColumn(
+                                                    "種別",
+                                                    width="medium"
+                                                ),
+                                                "前月": st.column_config.TextColumn(
+                                                    "前月",
+                                                    width="small"
+                                                ),
+                                                "前月Lv": st.column_config.NumberColumn(
+                                                    "前月Lv",
+                                                    width="small"
+                                                ),
+                                                "当月": st.column_config.TextColumn(
+                                                    "当月",
+                                                    width="small"
+                                                ),
+                                                "当月Lv": st.column_config.NumberColumn(
+                                                    "当月Lv",
+                                                    width="small"
+                                                ),
+                                                "変動": st.column_config.NumberColumn(
+                                                    "変動",
+                                                    width="small",
+                                                    format="%+d"
+                                                ),
+                                            }
                                         )
                                     else:
                                         st.info(f"条件（レベル変動±{threshold}以上）に該当するユーザーはいませんでした。")
@@ -487,7 +532,7 @@ if st.session_state.show_stats_view:
                                 u_data_graph = u_full_display_df.sort_values('ym')
                                 u_data_table = u_full_display_df.sort_values('ym', ascending=False)
                                 
-                                col_left, col_right = st.columns([1, 2])
+                                col_left, col_right = st.columns([1, 3])
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
 
