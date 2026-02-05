@@ -452,6 +452,17 @@ if st.session_state.show_stats_view:
                                         display_df = alert_df.copy()
                                         display_df["順位"] = display_df["順位"].apply(lambda x: x if x != 999999 else "-")
 
+                                        # 【追加】前月・当月を数値化（右寄せ用）
+                                        display_df["前月_num"] = display_df["前月"].str.replace("/", "").astype(int)
+                                        display_df["当月_num"] = display_df["当月"].str.replace("/", "").astype(int)
+
+                                        # 元の文字列列を削除して置き換え
+                                        display_df = display_df.drop(columns=["前月", "当月"])
+                                        display_df = display_df.rename(columns={
+                                            "前月_num": "前月",
+                                            "当月_num": "当月"
+                                        })
+
                                         st.dataframe(
                                             display_df.style.map(highlight_kind, subset=["種別"]),
                                             use_container_width=True,
@@ -471,17 +482,19 @@ if st.session_state.show_stats_view:
                                                     "種別",
                                                     width="medium"
                                                 ),
-                                                "前月": st.column_config.TextColumn(
+                                                "前月": st.column_config.NumberColumn(
                                                     "前月",
-                                                    width="small"
+                                                    width="small",
+                                                    format="%d"
                                                 ),
                                                 "前月Lv": st.column_config.NumberColumn(
                                                     "前月Lv",
                                                     width="small"
                                                 ),
-                                                "当月": st.column_config.TextColumn(
+                                                "当月": st.column_config.NumberColumn(
                                                     "当月",
-                                                    width="small"
+                                                    width="small",
+                                                    format="%d"
                                                 ),
                                                 "当月Lv": st.column_config.NumberColumn(
                                                     "当月Lv",
