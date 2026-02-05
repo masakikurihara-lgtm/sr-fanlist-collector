@@ -564,16 +564,33 @@ if st.session_state.show_stats_view:
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
 
-                                    display_df = u_data_table.rename(columns={
+                                    display_df = u_data_table.copy()
+
+                                    # 表示用に列名変更（型は数値のまま保持）
+                                    display_df = display_df.rename(columns={
                                         "ym": "対象月",
                                         "level": "レベル"
                                     })
 
+                                    # 並び順を明示（念のため）
+                                    display_df = display_df[["対象月", "レベル"]]
+
                                     st.dataframe(
                                         display_df,
                                         use_container_width=True,
-                                        height=300,
-                                        hide_index=True
+                                        height=275,
+                                        hide_index=True,
+                                        column_config={
+                                            "対象月": st.column_config.NumberColumn(
+                                                "対象月",
+                                                width="small",
+                                                format="%d"
+                                            ),
+                                            "レベル": st.column_config.NumberColumn(
+                                                "レベル",
+                                                width="small"
+                                            ),
+                                        }
                                     )
                                 
                                 with col_right:
