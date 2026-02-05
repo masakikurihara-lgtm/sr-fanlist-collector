@@ -296,7 +296,7 @@ if st.session_state.show_stats_view:
 
                             # マルチカラムをフラット化
                             analysis_df.columns = ['user_id', 'レベル合計値', 'ファン回数', 'ユーザー名']
-                            
+
                             analysis_df['平均レベル'] = analysis_df['レベル合計値'] / len(selected_months)
                             analysis_df['平均レベル'] = analysis_df['平均レベル'].round(1)
 
@@ -311,7 +311,6 @@ if st.session_state.show_stats_view:
                             # --- 🏆 合算ランキング（DataFrame表示） ---
 
                             display_df = analysis_df.copy()
-                            display_df['順位'] = display_df['順位'].astype(str) + '位'
 
 
                             # 表示順・列順を整理
@@ -326,11 +325,30 @@ if st.session_state.show_stats_view:
                                 height=500,
                                 hide_index=True,
                                 column_config={
-                                    "順位": st.column_config.TextColumn(
+                                    "順位": st.column_config.NumberColumn(
                                         "順位",
                                         width="small",
-                                        help="ランキング順位"
-                                    )
+                                        format="%d 位"
+                                    ),
+                                    "ユーザー名": st.column_config.TextColumn(
+                                        "ユーザー名",
+                                        width="large"
+                                    ),
+                                    "レベル合計値": st.column_config.NumberColumn(
+                                        "レベル合計値",
+                                        width="medium",
+                                        format="%d"
+                                    ),
+                                    "平均レベル": st.column_config.NumberColumn(
+                                        "平均レベル",
+                                        width="medium",
+                                        format="%.1f"
+                                    ),
+                                    "ファン回数": st.column_config.NumberColumn(
+                                        "ファン回数",
+                                        width="medium",
+                                        format="%d"
+                                    ),
                                 }
                             )
 
