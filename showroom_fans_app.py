@@ -323,7 +323,7 @@ if st.session_state.show_stats_view:
                             st.dataframe(
                                 display_df,
                                 use_container_width=True,
-                                height=600,
+                                height=500,
                                 hide_index=True,
                                 column_config={
                                     "順位": st.column_config.TextColumn(
