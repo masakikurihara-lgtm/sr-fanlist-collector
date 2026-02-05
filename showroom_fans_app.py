@@ -388,26 +388,37 @@ if st.session_state.show_stats_view:
                                             })
                                     
                                     if alert_list:
-                                        alert_list.sort(key=lambda x: x['rank'])
-                                        alert_html = f"{table_style}<div class='scroll-table' style='max-height:50vh;'><table><thead><tr><th>順位</th><th>ユーザー名</th><th>種別</th><th>前月</th><th>前月Lv</th><th>当月</th><th>当月Lv</th><th>変動</th></tr></thead><tbody>"
+                                        rows = []
+
                                         for user_block in alert_list:
-                                            for a in user_block['alerts']:
-                                                # ユーザー名をHTMLエスケープ処理する
-                                                u_name = html.escape(str(a.get('ユーザー名', '不明')))
-                                                
-                                                alert_html += "<tr>"
-                                                alert_html += f"<td style='text-align:center; font-weight:bold;'>{a['順位']}</td>"
-                                                alert_html += f"<td>{u_name}</td>" # ここをエスケープ済みの変数に
-                                                alert_html += f"<td style='text-align:center;'>{a['種別']}</td>"
-                                                alert_html += f"<td style='text-align:center;'>{a['前月']}</td>"
-                                                alert_html += f"<td style='text-align:center;'>{a['前月Lv']}</td>"
-                                                alert_html += f"<td style='text-align:center;'>{a['当月']}</td>"
-                                                alert_html += f"<td style='text-align:center;'>{a['当月Lv']}</td>"
-                                                alert_html += f"<td style='text-align:center; font-weight:bold;'>{a['変動']}</td>"
-                                                alert_html += "</tr>"
-                                                
-                                        alert_html += "</tbody></table></div>"
-                                        st.markdown(alert_html, unsafe_allow_html=True)
+                                            for a in user_block["alerts"]:
+                                                rows.append({
+                                                    "順位": a["順位"],
+                                                    "ユーザー名": a.get("ユーザー名", "不明"),
+                                                    "種別": a["種別"],
+                                                    "前月": a["前月"],
+                                                    "前月Lv": a["前月Lv"],
+                                                    "当月": a["当月"],
+                                                    "当月Lv": a["当月Lv"],
+                                                    "変動": a["変動"]
+                                                })
+
+                                        alert_df = pd.DataFrame(rows)
+
+                                        alert_df["_rank"] = alert_df["順位"].replace("-", 999999).astype(int)
+                                        alert_df["_month"] = alert_df["当月"].str.replace("/", "").astype(int)
+
+                                        alert_df = alert_df.sort_values(
+                                            by=["_rank", "_month"],
+                                            ascending=[True, False]
+                                        ).drop(columns=["_rank", "_month"])
+
+                                        st.dataframe(
+                                            alert_df,
+                                            use_container_width=True,
+                                            height=500,
+                                            hide_index=True
+                                        )
                                     else:
                                         st.info(f"条件（レベル変動±{threshold}以上）に該当するユーザーはいませんでした。")
 
@@ -451,13 +462,18 @@ if st.session_state.show_stats_view:
                                 col_left, col_right = st.columns([1, 2])
                                 with col_left:
                                     st.write("##### 📋 月別レベル一覧")
-                                    u_table_html = f"{table_style}<div class='scroll-table' style='max-height:300px;'><table><thead><tr><th>対象月</th><th>レベル</th></tr></thead><tbody>"
-                                    for _, u_row in u_data_table.iterrows():
-                                        # レベル0は強調するなど、視認性を上げることも可能です
-                                        lv_display = u_row['level']
-                                        u_table_html += f"<tr><td style='text-align:center; font-weight:bold;'>{u_row['ym']}</td><td style='text-align:center;'>{lv_display}</td></tr>"
-                                    u_table_html += "</tbody></table></div>"
-                                    st.markdown(u_table_html, unsafe_allow_html=True)
+
+                                    display_df = u_data_table.rename(columns={
+                                        "ym": "対象月",
+                                        "level": "レベル"
+                                    })
+
+                                    st.dataframe(
+                                        display_df,
+                                        use_container_width=True,
+                                        height=300,
+                                        hide_index=True
+                                    )
                                 
                                 with col_right:
                                     st.write("##### 📈 レベル推移グラフ")
