@@ -298,6 +298,7 @@ if st.session_state.show_stats_view:
                             analysis_df.columns = ['user_id', 'レベル合計値', 'ファン回数', 'ユーザー名']
                             
                             analysis_df['平均レベル'] = analysis_df['レベル合計値'] / len(selected_months)
+                            analysis_df['平均レベル'] = analysis_df['平均レベル'].round(1)
 
                             # 以降の処理（フィルタ・順位付け）
                             analysis_df = analysis_df[analysis_df['レベル合計値'] >= 0]
@@ -310,6 +311,8 @@ if st.session_state.show_stats_view:
                             # --- 🏆 合算ランキング（DataFrame表示） ---
 
                             display_df = analysis_df.copy()
+                            display_df['順位'] = display_df['順位'].astype(str) + '位'
+
 
                             # 表示順・列順を整理
                             display_df = display_df[
@@ -321,7 +324,14 @@ if st.session_state.show_stats_view:
                                 display_df,
                                 use_container_width=True,
                                 height=600,
-                                hide_index=True
+                                hide_index=True,
+                                column_config={
+                                    "順位": st.column_config.TextColumn(
+                                        "順位",
+                                        width="small",
+                                        help="ランキング順位"
+                                    )
+                                }
                             )
 
                             # --- 📈 レベル変動（急上昇・急下落）分析 ---
