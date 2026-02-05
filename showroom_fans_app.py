@@ -407,7 +407,9 @@ if st.session_state.show_stats_view:
                                         
                                         if user_temp_alerts:
                                             # 月が新しい順に並べ替え
-                                            user_temp_alerts.sort(key=lambda x: -int(str(x['raw_month']).replace('/','')))
+                                            user_temp_alerts.sort(
+                                                key=lambda x: -int(str(x['前月']).replace('/',''))
+                                            )
                                             alert_list.append({
                                                 "rank": u_rank,
                                                 "alerts": user_temp_alerts
