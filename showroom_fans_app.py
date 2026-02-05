@@ -290,12 +290,12 @@ if st.session_state.show_stats_view:
                                     ('レベル合計値', 'sum'),
                                     ('ファン回数', lambda x: (x >= 10).sum())
                                 ],
-                                'user_name': 'first',
-                                'avatar_id': 'first'
+                                'user_name': 'first'
                             }).reset_index()
 
+
                             # マルチカラムをフラット化
-                            analysis_df.columns = ['user_id', 'レベル合計値', 'ファン回数', 'ユーザー名', 'アバター']
+                            analysis_df.columns = ['user_id', 'レベル合計値', 'ファン回数', 'ユーザー名']
                             
                             analysis_df['平均レベル'] = analysis_df['レベル合計値'] / len(selected_months)
 
@@ -307,26 +307,21 @@ if st.session_state.show_stats_view:
                             # 順位引き出し用の辞書作成
                             rank_map = analysis_df.set_index('user_id')['順位'].to_dict()
 
-                            table_style = "<style>.scroll-table { max-height: 70vh; overflow-y: auto; border: 1px solid #e5e7eb; position: relative; } .scroll-table table { width: 100%; border-collapse: collapse; font-size: 14px; } .scroll-table thead th { position: sticky; top: 0; background-color: #f3f4f6; z-index: 1; border-bottom: 2px solid #e5e7eb; padding: 10px; } .scroll-table td { padding: 8px; border-bottom: 1px solid #f0f0f0; }</style>"
-                            
-                            table_html_detail = f"{table_style}<div class='scroll-table'><table><thead><tr><th>順位</th><th>アバター</th><th>ユーザー名</th><th>レベル合計値</th><th>平均レベル</th><th>ファン回数</th></tr></thead><tbody>"
-                            
-                            for _, row in analysis_df.iterrows():
-                                # ユーザー名をHTMLエスケープ処理する
-                                safe_name = html.escape(str(row['ユーザー名']))
-                                
-                                table_html_detail += "<tr>"
-                                table_html_detail += f"<td style='text-align:center; font-weight:bold;'>{row['順位']}</td>"
-                                table_html_detail += f"<td style='text-align:center;'><img src='https://static.showroom-live.com/image/avatar/{row['アバター']}.png' width='30'></td>"
-                                table_html_detail += f"<td>{safe_name}</td>" # ここをsafe_nameに変更
-                                table_html_detail += f"<td style='text-align:center;'>{row['レベル合計値']:,}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{row['平均レベル']:.1f}</td>"
-                                table_html_detail += f"<td style='text-align:center;'>{int(row['ファン回数'])}回</td>"
-                                table_html_detail += "</tr>"
-                                
-                            table_html_detail += "</tbody></table></div>"
-                            st.markdown(table_html_detail, unsafe_allow_html=True)
+                            # --- 🏆 合算ランキング（DataFrame表示） ---
 
+                            display_df = analysis_df.copy()
+
+                            # 表示順・列順を整理
+                            display_df = display_df[
+                                ['順位', 'ユーザー名', 'レベル合計値', '平均レベル', 'ファン回数']
+                            ]
+
+                            # 件数が多くても落ちない表示
+                            st.dataframe(
+                                display_df,
+                                use_container_width=True,
+                                height=600
+                            )
 
                             # --- 📈 レベル変動（急上昇・急下落）分析 ---
                             st.write("---")
