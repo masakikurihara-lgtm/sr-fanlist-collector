@@ -81,7 +81,7 @@ if not st.session_state.authenticated:
 room_id = st.text_input("対象のルームID:", placeholder="例: 154851", value="")
 
 # 月の範囲を作成
-start_date = datetime(2025, 1, 1)
+start_date = datetime(2023, 9, 1)
 current_date = datetime.now()
 month_labels = []
 tmp_date = current_date
